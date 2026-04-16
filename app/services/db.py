@@ -7,22 +7,70 @@ from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
 _pool: pool.ThreadedConnectionPool | None = None
-_pool_failed = False
 _last_error = ""
 
 
+def _generate_lakebase_token() -> str:
+    """Generate an OAuth token for Lakebase using the app's SP credentials."""
+    try:
+        from databricks.sdk import WorkspaceClient
+        w = WorkspaceClient()
+        # Use the database credential generation API
+        result = w.api_client.do(
+            "POST",
+            "/api/2.0/database/credentials",
+            body={"request_id": f"lakebase-features-{int(time.time())}"},
+        )
+        token = result.get("token", "")
+        if token:
+            logger.info("Generated Lakebase OAuth token via SDK")
+            return token
+    except Exception as e:
+        logger.warning(f"SDK credential generation failed: {e}")
+
+    # Fallback: try using DATABRICKS_CLIENT_ID/SECRET for OAuth
+    try:
+        import httpx
+        host = os.environ.get("DATABRICKS_HOST", "")
+        client_id = os.environ.get("DATABRICKS_CLIENT_ID", "")
+        client_secret = os.environ.get("DATABRICKS_CLIENT_SECRET", "")
+        if host and client_id and client_secret:
+            resp = httpx.post(
+                f"{host}/oidc/v1/token",
+                data={
+                    "grant_type": "client_credentials",
+                    "scope": "all-apis",
+                },
+                auth=(client_id, client_secret),
+                timeout=10,
+            )
+            if resp.status_code == 200:
+                token = resp.json().get("access_token", "")
+                if token:
+                    logger.info("Generated OAuth token via client_credentials flow")
+                    return token
+    except Exception as e:
+        logger.warning(f"OAuth token generation failed: {e}")
+
+    return ""
+
+
 def get_pool() -> pool.ThreadedConnectionPool | None:
-    global _pool, _pool_failed, _last_error
+    global _pool, _last_error
     if _pool is not None:
         return _pool
-    # Retry on every call (don't cache failures — resource may be attached after startup)
 
     pghost = os.environ.get("PGHOST", "")
     if not pghost:
         logger.warning("PGHOST not set — running without Lakebase connection")
-        _pool_failed = True
         return None
     try:
+        pgpassword = os.environ.get("PGPASSWORD", "")
+
+        # If no password provided, generate an OAuth token
+        if not pgpassword:
+            pgpassword = _generate_lakebase_token()
+
         conn_params = {
             "host": pghost,
             "port": int(os.environ.get("PGPORT", "5432")),
@@ -30,10 +78,9 @@ def get_pool() -> pool.ThreadedConnectionPool | None:
             "database": os.environ.get("PGDATABASE", "postgres"),
             "sslmode": os.environ.get("PGSSLMODE", "require"),
         }
-        # Only set password if explicitly provided (provisioned Lakebase uses SP auth without password)
-        pgpassword = os.environ.get("PGPASSWORD", "")
         if pgpassword:
             conn_params["password"] = pgpassword
+
         _pool = pool.ThreadedConnectionPool(
             minconn=1,
             maxconn=10,
