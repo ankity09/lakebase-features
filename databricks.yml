@@ -3,11 +3,33 @@ bundle:
 
 targets:
   dev:
+    default: true
     workspace:
       host: https://fevm-serverless-stable-trvrmk.cloud.databricks.com
-
-resources:
-  apps:
-    lakebase-features:
-      name: lakebase-features
-      source_code_path: .
+    resources:
+      apps:
+        lakebase-features:
+          name: lakebase-features
+          source_code_path: .
+          config:
+            command:
+              - uvicorn
+              - app.main:app
+              - --host=0.0.0.0
+              - --port=8000
+            env:
+              - name: PGHOST
+                valueFrom: resources.lakebase_db.host
+              - name: PGPORT
+                valueFrom: resources.lakebase_db.port
+              - name: PGUSER
+                valueFrom: resources.lakebase_db.user
+              - name: PGPASSWORD
+                valueFrom: resources.lakebase_db.password
+              - name: PGDATABASE
+                value: "postgres"
+              - name: FMAPI_ENDPOINT
+                value: "databricks-bge-small-en"
+            resources:
+              - name: lakebase_db
+                type: lakebase

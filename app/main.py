@@ -8,14 +8,25 @@ from app.services.db import get_pool
 from app.services.seed import seed_if_needed
 
 
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    get_pool()
-    seed_if_needed()
+    pool = get_pool()
+    if pool is not None:
+        logger.info("Lakebase connected — running seed check")
+        try:
+            seed_if_needed()
+        except Exception as e:
+            logger.warning(f"Seed failed (will retry on next request): {e}")
+    else:
+        logger.warning("Starting without Lakebase — attach the resource in App settings, then restart")
     yield
-    p = get_pool()
-    if p:
-        p.closeall()
+    pool = get_pool()
+    if pool:
+        pool.closeall()
 
 
 app = FastAPI(title="Lakebase Features", lifespan=lifespan)

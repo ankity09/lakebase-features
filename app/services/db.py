@@ -1,30 +1,50 @@
 import os
 import time
+import logging
 import psycopg2
 from psycopg2 import pool
 from contextlib import contextmanager
 
+logger = logging.getLogger(__name__)
 _pool: pool.ThreadedConnectionPool | None = None
+_pool_failed = False
 
 
-def get_pool() -> pool.ThreadedConnectionPool:
-    global _pool
-    if _pool is None:
+def get_pool() -> pool.ThreadedConnectionPool | None:
+    global _pool, _pool_failed
+    if _pool is not None:
+        return _pool
+    if _pool_failed:
+        return None
+    pghost = os.environ.get("PGHOST", "")
+    if not pghost:
+        logger.warning("PGHOST not set — running without Lakebase connection")
+        _pool_failed = True
+        return None
+    try:
         _pool = pool.ThreadedConnectionPool(
-            minconn=2,
+            minconn=1,
             maxconn=10,
-            host=os.environ["PGHOST"],
+            host=pghost,
             port=int(os.environ.get("PGPORT", "5432")),
-            user=os.environ["PGUSER"],
-            password=os.environ["PGPASSWORD"],
-            database=os.environ.get("PGDATABASE", "appshield"),
+            user=os.environ.get("PGUSER", ""),
+            password=os.environ.get("PGPASSWORD", ""),
+            database=os.environ.get("PGDATABASE", "postgres"),
+            sslmode="require",
         )
+        logger.info(f"Connected to Lakebase at {pghost}")
+    except Exception as e:
+        logger.warning(f"Failed to connect to Lakebase: {e}")
+        _pool_failed = True
+        return None
     return _pool
 
 
 @contextmanager
 def get_conn():
     p = get_pool()
+    if p is None:
+        raise ConnectionError("Lakebase not connected — attach the Lakebase resource in Databricks Apps settings")
     conn = p.getconn()
     try:
         yield conn
