@@ -11,47 +11,31 @@ _last_error = ""
 
 
 def _generate_lakebase_token() -> str:
-    """Generate an OAuth token for Lakebase using the app's SP credentials."""
+    """Generate an OAuth token for Lakebase using the SDK's header factory.
+
+    This is the same approach used by the lakebase-mcp-server for provisioned instances.
+    The SDK's WorkspaceClient auto-discovers credentials (SP client_id/secret in Apps runtime)
+    and the header_factory produces a Bearer token that Lakebase accepts as a password.
+    """
     try:
         from databricks.sdk import WorkspaceClient
         w = WorkspaceClient()
-        # Use the database credential generation API
-        result = w.api_client.do(
-            "POST",
-            "/api/2.0/database/credentials",
-            body={"request_id": f"lakebase-features-{int(time.time())}"},
-        )
-        token = result.get("token", "")
-        if token:
-            logger.info("Generated Lakebase OAuth token via SDK")
-            return token
-    except Exception as e:
-        logger.warning(f"SDK credential generation failed: {e}")
-
-    # Fallback: try using DATABRICKS_CLIENT_ID/SECRET for OAuth
-    try:
-        import httpx
-        host = os.environ.get("DATABRICKS_HOST", "")
-        client_id = os.environ.get("DATABRICKS_CLIENT_ID", "")
-        client_secret = os.environ.get("DATABRICKS_CLIENT_SECRET", "")
-        if host and client_id and client_secret:
-            resp = httpx.post(
-                f"{host}/oidc/v1/token",
-                data={
-                    "grant_type": "client_credentials",
-                    "scope": "all-apis",
-                },
-                auth=(client_id, client_secret),
-                timeout=10,
-            )
-            if resp.status_code == 200:
-                token = resp.json().get("access_token", "")
+        header_factory = w.config._header_factory
+        if callable(header_factory):
+            result = header_factory()
+            if isinstance(result, dict):
+                token = result.get("Authorization", "").removeprefix("Bearer ")
                 if token:
-                    logger.info("Generated OAuth token via client_credentials flow")
+                    logger.info("Generated Lakebase OAuth token via SDK header factory")
                     return token
+                else:
+                    logger.warning("header_factory returned no Authorization header")
+            else:
+                logger.warning(f"header_factory returned non-dict: {type(result)}")
+        else:
+            logger.warning("header_factory is not callable")
     except Exception as e:
-        logger.warning(f"OAuth token generation failed: {e}")
-
+        logger.warning(f"SDK token generation failed: {e}")
     return ""
 
 
