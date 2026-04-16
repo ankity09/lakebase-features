@@ -48,6 +48,7 @@ from app.routers import infrastructure; app.include_router(infrastructure.router
 from app.routers import feature_store; app.include_router(feature_store.router)
 from app.routers import pgvector; app.include_router(pgvector.router)
 from app.routers import monitoring; app.include_router(monitoring.router)
+from app.routers import recovery; app.include_router(recovery.router)
 
 # Serve vanilla frontend from app/frontend/
 frontend_dir = Path(__file__).parent / "frontend"

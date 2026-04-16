@@ -1500,6 +1500,10 @@ code, pre, .mono { font-family: 'Space Mono', monospace; }
       <span class="nav-icon">&#127807;</span>
       <span class="nav-label">Branching</span>
     </div>
+    <div class="nav-item" data-page="recovery">
+      <span class="nav-icon">&#128260;</span>
+      <span class="nav-label">Recovery</span>
+    </div>
     <div class="nav-item" data-page="autoscaling">
       <span class="nav-icon">&#128200;</span>
       <span class="nav-label">Autoscaling</span>
@@ -1996,6 +2000,84 @@ code, pre, .mono { font-family: 'Space Mono', monospace; }
         When ready, merge the changes to production.
       </p>
     </div>
+  </div>
+</section>
+
+<!-- ====================================================================
+     RECOVERY PAGE
+     ==================================================================== -->
+<section class="page" id="page-recovery">
+  <div class="page-header">
+    <h1 class="page-title">Snapshot & Recovery</h1>
+    <button class="btn btn-sm btn-ghost btn-icon btn-refresh" onclick="loadRecovery()" title="Refresh">&#8635;</button>
+  </div>
+
+  <div class="explainer" id="explainer-recovery">
+    <button class="explainer-toggle" onclick="toggleExplainer('recovery')">
+      <span class="chevron">&#9654;</span> What is this?
+    </button>
+    <div class="explainer-body">
+      <strong>Point-in-Time Recovery</strong> lets you restore your database to any moment within a 7-day window.
+      Lakebase creates an instant, zero-copy branch at the exact timestamp you specify, letting you recover data
+      without downtime or full backups. Walk through the demo below to see it in action.
+    </div>
+  </div>
+
+  <!-- Workflow steps -->
+  <div class="card mb-16">
+    <div class="card-title">Interactive Recovery Demo</div>
+    <p style="color:var(--text-secondary);margin-bottom:20px;">Follow these 5 steps to see point-in-time recovery in action with real data.</p>
+
+    <!-- Step indicators -->
+    <div id="recovery-steps" style="display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap;">
+      <div class="recovery-step active" id="rstep-1" style="flex:1;min-width:120px;padding:12px;border-radius:8px;background:var(--surface-3);border:2px solid var(--neon);text-align:center;cursor:pointer;" onclick="scrollToRecoveryStep(1)">
+        <div style="font-size:20px;">1</div>
+        <div style="font-size:11px;color:var(--text-secondary);">Create Table</div>
+      </div>
+      <div class="recovery-step" id="rstep-2" style="flex:1;min-width:120px;padding:12px;border-radius:8px;background:var(--surface-3);border:2px solid var(--surface-3);text-align:center;cursor:pointer;opacity:0.5;" onclick="scrollToRecoveryStep(2)">
+        <div style="font-size:20px;">2</div>
+        <div style="font-size:11px;color:var(--text-secondary);">Take Snapshot</div>
+      </div>
+      <div class="recovery-step" id="rstep-3" style="flex:1;min-width:120px;padding:12px;border-radius:8px;background:var(--surface-3);border:2px solid var(--surface-3);text-align:center;cursor:pointer;opacity:0.5;" onclick="scrollToRecoveryStep(3)">
+        <div style="font-size:20px;">3</div>
+        <div style="font-size:11px;color:var(--text-secondary);">Corrupt Data</div>
+      </div>
+      <div class="recovery-step" id="rstep-4" style="flex:1;min-width:120px;padding:12px;border-radius:8px;background:var(--surface-3);border:2px solid var(--surface-3);text-align:center;cursor:pointer;opacity:0.5;" onclick="scrollToRecoveryStep(4)">
+        <div style="font-size:20px;">4</div>
+        <div style="font-size:11px;color:var(--text-secondary);">Restore</div>
+      </div>
+      <div class="recovery-step" id="rstep-5" style="flex:1;min-width:120px;padding:12px;border-radius:8px;background:var(--surface-3);border:2px solid var(--surface-3);text-align:center;cursor:pointer;opacity:0.5;" onclick="scrollToRecoveryStep(5)">
+        <div style="font-size:20px;">5</div>
+        <div style="font-size:11px;color:var(--text-secondary);">Verify</div>
+      </div>
+    </div>
+
+    <!-- Step 1: Create -->
+    <div id="recovery-action-area">
+      <div class="mb-16" id="recovery-step-1">
+        <div style="font-weight:600;color:var(--text-primary);margin-bottom:8px;">Step 1: Create a demo table with sample data</div>
+        <button class="btn btn-primary" onclick="recoveryCreateTable()">Create recovery_demo table (5 rows)</button>
+      </div>
+    </div>
+
+    <!-- Data display -->
+    <div class="section-title mt-24">Current Table State</div>
+    <div id="recovery-table-display" style="color:var(--text-muted);padding:20px;text-align:center;">
+      Click "Create" to start the demo
+    </div>
+
+    <!-- Snapshot info -->
+    <div id="recovery-snapshot-info" style="display:none;" class="mt-16">
+      <div style="background:rgba(0,229,153,0.08);border:1px solid var(--neon);border-radius:8px;padding:12px 16px;">
+        <strong style="color:var(--neon);">Snapshot taken</strong>
+        <span style="color:var(--text-secondary);"> at </span>
+        <code id="recovery-snapshot-ts" style="color:var(--neon);font-family:'Space Mono',monospace;"></code>
+        <span style="color:var(--text-muted);"> — this is your restore point</span>
+      </div>
+    </div>
+
+    <!-- Recovery result -->
+    <div id="recovery-result" style="display:none;" class="mt-16"></div>
   </div>
 </section>
 
@@ -2544,6 +2626,7 @@ function navigateTo(page) {
     case 'query': break;
     case 'sync': loadSync(); break;
     case 'branching': loadBranches(); break;
+    case 'recovery': loadRecovery(); break;
     case 'autoscaling': loadAutoscaling(); break;
     case 'scaletozero': loadScaleToZero(); break;
     case 'replicas': loadReplicas(); break;
@@ -2727,6 +2810,7 @@ function renderFeatureGrid() {
     { page: 'query', icon: '&#128221;', title: 'Query Editor', desc: 'Write and execute SQL directly against Lakebase with syntax highlighting and EXPLAIN ANALYZE.' },
     { page: 'sync', icon: '&#128260;', title: 'Data Sync', desc: 'Zero-ETL automatic sync from Lakebase (Postgres) to Delta Lake tables in your Lakehouse.' },
     { page: 'branching', icon: '&#127807;', title: 'Branching', desc: 'Create isolated database branches for safe schema migrations and development sandboxes.' },
+    { page: 'recovery', icon: '&#128260;', title: 'Recovery', desc: 'Point-in-time recovery with instant restore from any moment in the last 7 days.' },
     { page: 'autoscaling', icon: '&#128200;', title: 'Autoscaling', desc: 'Dynamically adjust compute units based on workload demand within configured bounds.' },
     { page: 'scaletozero', icon: '&#9199;', title: 'Scale to Zero', desc: 'Suspend compute when idle to pay only for storage. Auto-resume on connection.' },
     { page: 'replicas', icon: '&#128214;', title: 'Read Replicas', desc: 'Dedicated read-only endpoints to offload analytical queries from the primary.' },
@@ -3501,6 +3585,185 @@ async function deleteBranch(name) {
     renderBranches();
     showToast(`Branch "${name}" deleted (demo)`, 'info');
   }
+}
+
+/* ========================================================================
+   RECOVERY
+   ======================================================================== */
+let _recoverySnapshot = null;
+let _recoveryStep = 1;
+
+async function loadRecovery() {
+  _recoveryStep = 1;
+  _recoverySnapshot = null;
+  updateRecoverySteps(1);
+  document.getElementById('recovery-snapshot-info').style.display = 'none';
+  document.getElementById('recovery-result').style.display = 'none';
+  // Try loading existing table
+  try {
+    const data = await apiCall('GET', '/recovery/demo-table');
+    if (data.rows && data.rows.length > 0) {
+      renderRecoveryTable(data.rows);
+      _recoveryStep = 2;
+      updateRecoverySteps(2);
+      updateRecoveryActionArea();
+    } else {
+      document.getElementById('recovery-table-display').innerHTML = '<div style="color:var(--text-muted);padding:20px;text-align:center;">Table is empty. Create or restore data.</div>';
+      if (_recoverySnapshot) {
+        _recoveryStep = 4;
+        updateRecoverySteps(4);
+        updateRecoveryActionArea();
+      }
+    }
+  } catch (e) {
+    document.getElementById('recovery-table-display').innerHTML = '<div style="color:var(--text-muted);padding:20px;text-align:center;">Click "Create" to start the demo</div>';
+    updateRecoveryActionArea();
+  }
+}
+
+function updateRecoverySteps(active) {
+  for (let i = 1; i <= 5; i++) {
+    const el = document.getElementById(`rstep-${i}`);
+    if (i < active) {
+      el.style.borderColor = 'var(--neon)';
+      el.style.opacity = '0.7';
+      el.style.background = 'rgba(0,229,153,0.1)';
+    } else if (i === active) {
+      el.style.borderColor = 'var(--neon)';
+      el.style.opacity = '1';
+      el.style.background = 'var(--surface-3)';
+    } else {
+      el.style.borderColor = 'var(--surface-3)';
+      el.style.opacity = '0.5';
+      el.style.background = 'var(--surface-3)';
+    }
+  }
+}
+
+function updateRecoveryActionArea() {
+  const area = document.getElementById('recovery-action-area');
+  if (_recoveryStep === 1) {
+    area.innerHTML = `<div class="mb-16"><div style="font-weight:600;color:var(--text-primary);margin-bottom:8px;">Step 1: Create a demo table with sample data</div><button class="btn btn-primary" onclick="recoveryCreateTable()">Create recovery_demo table (5 rows)</button></div>`;
+  } else if (_recoveryStep === 2) {
+    area.innerHTML = `<div class="mb-16"><div style="font-weight:600;color:var(--text-primary);margin-bottom:8px;">Step 2: Take a snapshot (records the current timestamp)</div><button class="btn" style="border-color:var(--neon);color:var(--neon);" onclick="recoveryTakeSnapshot()">&#128247; Take Snapshot</button></div>`;
+  } else if (_recoveryStep === 3) {
+    area.innerHTML = `<div class="mb-16"><div style="font-weight:600;color:var(--text-primary);margin-bottom:8px;">Step 3: Simulate data corruption (DELETE all rows)</div><button class="btn" style="border-color:var(--danger);color:var(--danger);" onclick="recoveryCorrupt()">&#9888; Delete All Data</button></div>`;
+  } else if (_recoveryStep === 4) {
+    area.innerHTML = `<div class="mb-16"><div style="font-weight:600;color:var(--text-primary);margin-bottom:8px;">Step 4: Restore from snapshot using Point-in-Time Recovery</div><p style="color:var(--text-secondary);font-size:13px;margin-bottom:12px;">This creates a branch at the snapshot timestamp, reads the data from that point in time, and copies it back to production.</p><button class="btn btn-primary" onclick="recoveryRestore()">&#9200; Restore to Snapshot</button></div>`;
+  } else if (_recoveryStep === 5) {
+    area.innerHTML = `<div class="mb-16"><div style="font-weight:600;color:var(--neon);margin-bottom:8px;">&#10003; Recovery Complete!</div><button class="btn btn-sm" onclick="recoveryReset()">Reset Demo</button></div>`;
+  }
+}
+
+function scrollToRecoveryStep(step) {
+  // Visual only — scroll the action area into view
+  document.getElementById('recovery-action-area').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function renderRecoveryTable(rows) {
+  if (!rows || rows.length === 0) {
+    document.getElementById('recovery-table-display').innerHTML = '<div style="color:var(--danger);padding:20px;text-align:center;font-size:18px;font-weight:600;">&#9888; TABLE IS EMPTY — Data has been deleted!</div>';
+    return;
+  }
+  let html = '<table style="width:100%;border-collapse:collapse;"><thead><tr>';
+  const cols = Object.keys(rows[0]);
+  cols.forEach(c => { html += `<th style="text-align:left;padding:8px 12px;border-bottom:1px solid var(--surface-3);color:var(--text-muted);font-size:12px;">${c}</th>`; });
+  html += '</tr></thead><tbody>';
+  rows.forEach(r => {
+    html += '<tr>';
+    cols.forEach(c => { html += `<td style="padding:8px 12px;border-bottom:1px solid var(--surface-1);color:var(--text-primary);font-family:'Space Mono',monospace;font-size:13px;">${r[c] ?? ''}</td>`; });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('recovery-table-display').innerHTML = html;
+}
+
+async function recoveryCreateTable() {
+  try {
+    const data = await apiCall('POST', '/recovery/demo-table');
+    showToast(`Created recovery_demo with ${data.row_count} rows`, 'success');
+    const table = await apiCall('GET', '/recovery/demo-table');
+    renderRecoveryTable(table.rows);
+    _recoveryStep = 2;
+    updateRecoverySteps(2);
+    updateRecoveryActionArea();
+  } catch (e) {
+    showToast('Failed to create demo table: ' + (e.response?.data?.detail || e.message), 'error');
+  }
+}
+
+async function recoveryTakeSnapshot() {
+  try {
+    const data = await apiCall('POST', '/recovery/snapshot');
+    _recoverySnapshot = data;
+    document.getElementById('recovery-snapshot-info').style.display = '';
+    document.getElementById('recovery-snapshot-ts').textContent = data.timestamp;
+    showToast(`Snapshot taken: ${data.snapshot_id} (${data.row_count} rows)`, 'success');
+    _recoveryStep = 3;
+    updateRecoverySteps(3);
+    updateRecoveryActionArea();
+  } catch (e) {
+    showToast('Failed to take snapshot: ' + (e.response?.data?.detail || e.message), 'error');
+  }
+}
+
+async function recoveryCorrupt() {
+  try {
+    const data = await apiCall('POST', '/recovery/corrupt');
+    showToast(`Deleted ${data.rows_deleted} rows — data is gone!`, 'error');
+    renderRecoveryTable([]);
+    _recoveryStep = 4;
+    updateRecoverySteps(4);
+    updateRecoveryActionArea();
+  } catch (e) {
+    showToast('Failed to corrupt data: ' + (e.response?.data?.detail || e.message), 'error');
+  }
+}
+
+async function recoveryRestore() {
+  if (!_recoverySnapshot) {
+    showToast('No snapshot to restore from', 'warning');
+    return;
+  }
+  const btn = document.querySelector('#recovery-action-area .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Restoring... (creating PITR branch)'; }
+
+  try {
+    const data = await apiCall('POST', '/recovery/restore', { snapshot_timestamp: _recoverySnapshot.timestamp });
+    const table = await apiCall('GET', '/recovery/demo-table');
+    renderRecoveryTable(table.rows);
+
+    document.getElementById('recovery-result').style.display = '';
+    document.getElementById('recovery-result').innerHTML = `
+      <div style="background:rgba(0,229,153,0.08);border:1px solid var(--neon);border-radius:8px;padding:16px;">
+        <div style="color:var(--neon);font-weight:600;font-size:16px;margin-bottom:8px;">&#10003; Recovery Successful</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;">
+          <div><div style="color:var(--text-muted);font-size:11px;">Rows Recovered</div><div style="color:var(--neon);font-family:'Space Mono',monospace;font-size:18px;">${data.rows_recovered}</div></div>
+          <div><div style="color:var(--text-muted);font-size:11px;">Elapsed Time</div><div style="color:var(--neon);font-family:'Space Mono',monospace;font-size:18px;">${data.elapsed_seconds.toFixed(1)}s</div></div>
+          <div><div style="color:var(--text-muted);font-size:11px;">PITR Branch</div><div style="color:var(--text-secondary);font-family:'Space Mono',monospace;font-size:13px;">${data.branch_used}</div></div>
+          <div><div style="color:var(--text-muted);font-size:11px;">Method</div><div style="color:var(--text-secondary);font-size:13px;">Zero-copy branch at timestamp</div></div>
+        </div>
+      </div>`;
+    showToast(`Recovered ${data.rows_recovered} rows in ${data.elapsed_seconds.toFixed(1)}s`, 'success');
+    _recoveryStep = 5;
+    updateRecoverySteps(5);
+    updateRecoveryActionArea();
+  } catch (e) {
+    showToast('Restore failed: ' + (e.response?.data?.detail || e.message), 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '&#9200; Restore to Snapshot'; }
+  }
+}
+
+async function recoveryReset() {
+  _recoverySnapshot = null;
+  _recoveryStep = 1;
+  document.getElementById('recovery-snapshot-info').style.display = 'none';
+  document.getElementById('recovery-result').style.display = 'none';
+  try { await apiCall('POST', '/recovery/cleanup'); } catch(e) {}
+  updateRecoverySteps(1);
+  updateRecoveryActionArea();
+  document.getElementById('recovery-table-display').innerHTML = '<div style="color:var(--text-muted);padding:20px;text-align:center;">Click "Create" to start the demo</div>';
+  showToast('Demo reset', 'info');
 }
 
 /* ========================================================================
