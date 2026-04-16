@@ -1,6 +1,6 @@
 import os
 from fastapi import APIRouter, HTTPException
-from app.services.db import check_health, execute_query
+from app.services.db import check_health, execute_query, get_last_error
 
 router = APIRouter(prefix="/api", tags=["health"])
 
@@ -12,7 +12,11 @@ def health():
         info["project_id"] = os.environ.get("LAKEBASE_PROJECT_ID", "unknown")
         return info
     except Exception as e:
-        raise HTTPException(status_code=503, detail=str(e))
+        error_msg = str(e)
+        last_db_error = get_last_error()
+        if last_db_error:
+            error_msg = f"{error_msg} | DB error: {last_db_error}"
+        raise HTTPException(status_code=503, detail=error_msg)
 
 @router.get("/debug/env")
 def debug_env():

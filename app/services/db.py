@@ -8,14 +8,15 @@ from contextlib import contextmanager
 logger = logging.getLogger(__name__)
 _pool: pool.ThreadedConnectionPool | None = None
 _pool_failed = False
+_last_error = ""
 
 
 def get_pool() -> pool.ThreadedConnectionPool | None:
-    global _pool, _pool_failed
+    global _pool, _pool_failed, _last_error
     if _pool is not None:
         return _pool
-    if _pool_failed:
-        return None
+    # Retry on every call (don't cache failures — resource may be attached after startup)
+
     pghost = os.environ.get("PGHOST", "")
     if not pghost:
         logger.warning("PGHOST not set — running without Lakebase connection")
@@ -40,10 +41,14 @@ def get_pool() -> pool.ThreadedConnectionPool | None:
         )
         logger.info(f"Connected to Lakebase at {pghost}")
     except Exception as e:
+        _last_error = str(e)
         logger.warning(f"Failed to connect to Lakebase: {e}")
-        _pool_failed = True
         return None
     return _pool
+
+
+def get_last_error() -> str:
+    return _last_error
 
 
 @contextmanager
