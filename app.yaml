@@ -6,16 +6,6 @@ command:
   - --port
   - 8000
 env:
-  - name: PGHOST
-    valueFrom: resources.lakebase_db.host
-  - name: PGPORT
-    valueFrom: resources.lakebase_db.port
-  - name: PGUSER
-    valueFrom: resources.lakebase_db.user
-  - name: PGPASSWORD
-    valueFrom: resources.lakebase_db.password
-  - name: PGDATABASE
-    value: "postgres"
   - name: FMAPI_ENDPOINT
     value: "databricks-bge-small-en"
   - name: DELTA_CATALOG
@@ -24,4 +14,7 @@ env:
     value: "telemetry"
 resources:
   - name: lakebase_db
-    type: lakebase
+    database:
+      instance_name: lakebase-features
+      database_name: databricks_postgres
+      permission: CAN_CONNECT_AND_CREATE
