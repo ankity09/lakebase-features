@@ -3166,41 +3166,143 @@ function showCompareBranchModal() {
     const target = document.getElementById('modal-compare-target').value;
     if (base === target) { showToast('Select two different branches', 'warning'); return; }
     closeModal();
+    // Show loading state
+    const container = document.getElementById('branch-compare-results');
+    container.style.display = 'block';
+    container.innerHTML = '<div class="skeleton skeleton-card" style="height:120px;"></div>';
     try {
       const data = await apiCall('GET', `/branches/compare?base=${base}&target=${target}`);
       renderBranchComparison(data);
     } catch (e) {
+      // Demo fallback with realistic schema diff data
       renderBranchComparison({
         base_branch: base,
         target_branch: target,
-        table_diffs: [
-          { table: 'telemetry_events', base_count: 50000, target_count: 50250, diff: '+250' },
-          { table: 'customer_features', base_count: 60000, target_count: 60000, diff: '0' },
+        summary: { tables_added: 1, tables_removed: 0, columns_changed: 2, indexes_added: 3, indexes_removed: 0 },
+        tables_added: [{ name: 'threat_intel_feeds', row_count: 12480 }],
+        tables_removed: [],
+        column_diffs: [
+          { table: 'telemetry_events', columns_added: [{ name: 'geo_country', data_type: 'character varying', is_nullable: 'YES' }, { name: 'risk_score', data_type: 'numeric', is_nullable: 'YES' }], columns_removed: [] },
+          { table: 'customer_features', columns_added: [{ name: 'last_threat_scan', data_type: 'timestamp with time zone', is_nullable: 'YES' }], columns_removed: [] },
         ],
+        indexes_added: [
+          { name: 'idx_telemetry_geo', definition: 'CREATE INDEX idx_telemetry_geo ON appshield.telemetry_events USING btree (geo_country)' },
+          { name: 'idx_telemetry_risk', definition: 'CREATE INDEX idx_telemetry_risk ON appshield.telemetry_events USING btree (risk_score)' },
+          { name: 'idx_threat_feed_ts', definition: 'CREATE INDEX idx_threat_feed_ts ON appshield.threat_intel_feeds USING btree (ingested_at DESC)' },
+        ],
+        indexes_removed: [],
+        row_counts: {
+          base: { telemetry_events: 50000, customer_features: 60000, alert_rules: 1200 },
+          target: { telemetry_events: 50250, customer_features: 60000, alert_rules: 1200, threat_intel_feeds: 12480 },
+        },
       });
     }
   });
 }
 
+function renderBranchDiff(data) {
+  let html = '';
+
+  // Summary bar
+  const s = data.summary;
+  html += '<div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;">';
+  if (s.tables_added) html += '<span style="background:rgba(0,229,153,0.15);color:#00E599;padding:6px 12px;border-radius:6px;font-size:13px;font-weight:600;">+' + s.tables_added + ' table' + (s.tables_added > 1 ? 's' : '') + '</span>';
+  if (s.tables_removed) html += '<span style="background:rgba(239,68,68,0.15);color:#EF4444;padding:6px 12px;border-radius:6px;font-size:13px;font-weight:600;">-' + s.tables_removed + ' table' + (s.tables_removed > 1 ? 's' : '') + '</span>';
+  if (s.columns_changed) html += '<span style="background:rgba(245,158,11,0.15);color:#F59E0B;padding:6px 12px;border-radius:6px;font-size:13px;font-weight:600;">~' + s.columns_changed + ' table' + (s.columns_changed > 1 ? 's' : '') + ' modified</span>';
+  if (s.indexes_added) html += '<span style="background:rgba(6,182,212,0.15);color:#06B6D4;padding:6px 12px;border-radius:6px;font-size:13px;font-weight:600;">+' + s.indexes_added + ' index' + (s.indexes_added > 1 ? 'es' : '') + '</span>';
+  if (s.indexes_removed) html += '<span style="background:rgba(239,68,68,0.15);color:#EF4444;padding:6px 12px;border-radius:6px;font-size:13px;font-weight:600;">-' + s.indexes_removed + ' index' + (s.indexes_removed > 1 ? 'es' : '') + '</span>';
+  if (!s.tables_added && !s.tables_removed && !s.columns_changed && !s.indexes_added && !s.indexes_removed) {
+    html += '<span style="background:rgba(156,163,175,0.15);color:#9CA3AF;padding:6px 12px;border-radius:6px;font-size:13px;">No schema differences</span>';
+  }
+  html += '</div>';
+
+  // Tables added
+  if (data.tables_added && data.tables_added.length) {
+    html += '<h3 style="color:#00E599;margin:16px 0 8px;font-size:14px;font-weight:600;">Tables Added</h3>';
+    data.tables_added.forEach(function(t) {
+      html += '<div style="border-left:3px solid #00E599;background:rgba(0,229,153,0.05);padding:12px 16px;border-radius:0 8px 8px 0;margin-bottom:8px;">'
+        + '<strong style="color:#F0F0F0;">+ ' + escapeHtml(t.name) + '</strong> <span style="color:#6B6B73;">(' + t.row_count.toLocaleString() + ' rows)</span>'
+        + '</div>';
+    });
+  }
+
+  // Tables removed
+  if (data.tables_removed && data.tables_removed.length) {
+    html += '<h3 style="color:#EF4444;margin:16px 0 8px;font-size:14px;font-weight:600;">Tables Removed</h3>';
+    data.tables_removed.forEach(function(t) {
+      html += '<div style="border-left:3px solid #EF4444;background:rgba(239,68,68,0.05);padding:12px 16px;border-radius:0 8px 8px 0;margin-bottom:8px;">'
+        + '<strong style="color:#F0F0F0;">- ' + escapeHtml(t.name) + '</strong> <span style="color:#6B6B73;">(' + t.row_count.toLocaleString() + ' rows)</span>'
+        + '</div>';
+    });
+  }
+
+  // Column diffs
+  if (data.column_diffs && data.column_diffs.length) {
+    html += '<h3 style="color:#F59E0B;margin:16px 0 8px;font-size:14px;font-weight:600;">Column Changes</h3>';
+    data.column_diffs.forEach(function(d) {
+      html += '<div style="border-left:3px solid #F59E0B;background:rgba(245,158,11,0.05);padding:12px 16px;border-radius:0 8px 8px 0;margin-bottom:8px;">'
+        + '<strong style="color:#F0F0F0;">' + escapeHtml(d.table) + '</strong><br>';
+      d.columns_added.forEach(function(c) {
+        html += '<span style="color:#00E599;font-family:\'Space Mono\',monospace;font-size:13px;">&nbsp;&nbsp;+ ' + escapeHtml(c.name) + ' ' + escapeHtml(c.data_type) + (c.is_nullable === 'YES' ? ' (nullable)' : '') + '</span><br>';
+      });
+      d.columns_removed.forEach(function(c) {
+        html += '<span style="color:#EF4444;font-family:\'Space Mono\',monospace;font-size:13px;">&nbsp;&nbsp;- ' + escapeHtml(c.name) + ' ' + escapeHtml(c.data_type) + '</span><br>';
+      });
+      html += '</div>';
+    });
+  }
+
+  // Indexes added
+  if (data.indexes_added && data.indexes_added.length) {
+    html += '<h3 style="color:#06B6D4;margin:16px 0 8px;font-size:14px;font-weight:600;">Indexes Added</h3>';
+    data.indexes_added.forEach(function(i) {
+      html += '<div style="border-left:3px solid #06B6D4;background:rgba(6,182,212,0.05);padding:12px 16px;border-radius:0 8px 8px 0;margin-bottom:8px;">'
+        + '<strong style="color:#F0F0F0;">+ ' + escapeHtml(i.name) + '</strong><br>'
+        + '<code style="color:#A0A0A8;font-family:\'Space Mono\',monospace;font-size:12px;">' + escapeHtml(i.definition) + '</code>'
+        + '</div>';
+    });
+  }
+
+  // Indexes removed
+  if (data.indexes_removed && data.indexes_removed.length) {
+    html += '<h3 style="color:#EF4444;margin:16px 0 8px;font-size:14px;font-weight:600;">Indexes Removed</h3>';
+    data.indexes_removed.forEach(function(i) {
+      html += '<div style="border-left:3px solid #EF4444;background:rgba(239,68,68,0.05);padding:12px 16px;border-radius:0 8px 8px 0;margin-bottom:8px;">'
+        + '<strong style="color:#F0F0F0;">- ' + escapeHtml(i.name) + '</strong><br>'
+        + '<code style="color:#A0A0A8;font-family:\'Space Mono\',monospace;font-size:12px;">' + escapeHtml(i.definition) + '</code>'
+        + '</div>';
+    });
+  }
+
+  // Row counts comparison
+  if (data.row_counts) {
+    html += '<h3 style="color:#F0F0F0;margin:16px 0 8px;font-size:14px;font-weight:600;">Row Counts</h3>';
+    html += '<table style="width:100%;border-collapse:collapse;"><thead><tr>'
+      + '<th style="text-align:left;padding:8px;border-bottom:1px solid #222328;color:#A0A0A8;font-size:12px;">Table</th>'
+      + '<th style="text-align:right;padding:8px;border-bottom:1px solid #222328;color:#A0A0A8;font-size:12px;">' + escapeHtml(data.base_branch) + '</th>'
+      + '<th style="text-align:right;padding:8px;border-bottom:1px solid #222328;color:#A0A0A8;font-size:12px;">' + escapeHtml(data.target_branch) + '</th>'
+      + '</tr></thead><tbody>';
+    var allTables = new Set([].concat(Object.keys(data.row_counts.base || {}), Object.keys(data.row_counts.target || {})));
+    allTables.forEach(function(t) {
+      var b = (data.row_counts.base || {})[t];
+      var tgt = (data.row_counts.target || {})[t];
+      var color = b === undefined ? '#00E599' : tgt === undefined ? '#EF4444' : '#F0F0F0';
+      html += '<tr><td style="padding:8px;border-bottom:1px solid #131418;color:' + color + ';font-size:13px;">' + escapeHtml(t) + '</td>'
+        + '<td style="text-align:right;padding:8px;border-bottom:1px solid #131418;color:#A0A0A8;font-family:\'Space Mono\',monospace;font-size:13px;">' + (b !== undefined ? b.toLocaleString() : '\u2014') + '</td>'
+        + '<td style="text-align:right;padding:8px;border-bottom:1px solid #131418;color:#A0A0A8;font-family:\'Space Mono\',monospace;font-size:13px;">' + (tgt !== undefined ? tgt.toLocaleString() : '\u2014') + '</td>'
+        + '</tr>';
+    });
+    html += '</tbody></table>';
+  }
+
+  return html;
+}
+
 function renderBranchComparison(data) {
   const container = document.getElementById('branch-compare-results');
   container.style.display = 'block';
-  container.innerHTML = `
-    <div class="section-title">Branch Comparison: ${escapeHtml(data.base_branch)} vs ${escapeHtml(data.target_branch)}</div>
-    <div class="table-wrap">
-      <table class="data-table">
-        <thead><tr><th>Table</th><th>${escapeHtml(data.base_branch)} Rows</th><th>${escapeHtml(data.target_branch)} Rows</th><th>Diff</th></tr></thead>
-        <tbody>
-          ${(data.table_diffs || []).map(d => `<tr>
-            <td>${escapeHtml(d.table)}</td>
-            <td>${(d.base_count || 0).toLocaleString()}</td>
-            <td>${(d.target_count || 0).toLocaleString()}</td>
-            <td><span class="badge ${d.diff === '0' || d.diff === 0 ? 'badge-muted' : 'badge-green'}">${d.diff}</span></td>
-          </tr>`).join('')}
-        </tbody>
-      </table>
-    </div>
-  `;
+  container.innerHTML = '<div class="section-title">Schema Diff: ' + escapeHtml(data.base_branch) + ' \u2192 ' + escapeHtml(data.target_branch) + '</div>'
+    + renderBranchDiff(data);
 }
 
 async function deleteBranch(name) {
