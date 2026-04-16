@@ -1821,18 +1821,182 @@ code, pre, .mono { font-family: 'Space Mono', monospace; }
     </div>
   </div>
 
-  <div class="flex gap-8 mb-24">
-    <button class="btn btn-primary" onclick="showCreateBranchModal()">+ Create Branch</button>
-    <button class="btn" onclick="showCompareBranchModal()">&#8644; Compare Branches</button>
+  <!-- Branch page tabs -->
+  <div class="flex gap-4 mb-24" style="border-bottom:1px solid var(--surface-3);padding-bottom:0;">
+    <button class="btn btn-sm" id="branch-tab-manage" onclick="switchBranchTab('manage')" style="border-bottom:2px solid var(--neon);border-radius:0;padding-bottom:8px;">Manage Branches</button>
+    <button class="btn btn-sm btn-ghost" id="branch-tab-how" onclick="switchBranchTab('how')" style="border-radius:0;padding-bottom:8px;">How Zero-Copy Works</button>
   </div>
 
-  <div class="section-title">Branches</div>
-  <div id="branch-list" class="feature-grid">
-    <div class="skeleton skeleton-card"></div>
-    <div class="skeleton skeleton-card"></div>
+  <!-- Tab: Manage -->
+  <div id="branch-panel-manage">
+    <div class="flex gap-8 mb-24">
+      <button class="btn btn-primary" onclick="showCreateBranchModal()">+ Create Branch</button>
+      <button class="btn" onclick="showCompareBranchModal()">&#8644; Compare Branches</button>
+    </div>
+
+    <div class="section-title">Branches</div>
+    <div id="branch-list" class="feature-grid">
+      <div class="skeleton skeleton-card"></div>
+      <div class="skeleton skeleton-card"></div>
+    </div>
+
+    <div id="branch-compare-results" class="mt-24" style="display:none;"></div>
   </div>
 
-  <div id="branch-compare-results" class="mt-24" style="display:none;"></div>
+  <!-- Tab: How Zero-Copy Works -->
+  <div id="branch-panel-how" style="display:none;">
+
+    <!-- Step 1: Before branching -->
+    <div class="card mb-16">
+      <div class="card-title" style="color:var(--neon);">Step 1: Single Production Database</div>
+      <p style="color:var(--text-secondary);margin:8px 0 16px;">A Postgres database is stored as 8KB pages on shared storage. Your telemetry_events table (50K rows) spans thousands of pages.</p>
+      <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;">
+        <div style="text-align:center;">
+          <div style="background:var(--surface-3);border-radius:8px;padding:12px 20px;border:1px solid var(--neon);">
+            <div style="font-family:'Space Mono',monospace;font-size:13px;color:var(--neon);">Production</div>
+            <div style="font-size:11px;color:var(--text-muted);">compute</div>
+          </div>
+        </div>
+        <div style="color:var(--text-muted);font-size:20px;">&#8594;</div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;">
+          <span class="cow-page" style="background:var(--neon);color:#0A0A0A;padding:4px 8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:11px;font-weight:600;">A</span>
+          <span class="cow-page" style="background:var(--neon);color:#0A0A0A;padding:4px 8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:11px;font-weight:600;">B</span>
+          <span class="cow-page" style="background:var(--neon);color:#0A0A0A;padding:4px 8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:11px;font-weight:600;">C</span>
+          <span class="cow-page" style="background:var(--neon);color:#0A0A0A;padding:4px 8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:11px;font-weight:600;">D</span>
+          <span class="cow-page" style="background:var(--neon);color:#0A0A0A;padding:4px 8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:11px;font-weight:600;">E</span>
+          <span style="color:var(--text-muted);font-size:12px;">... 1000s more</span>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);background:var(--surface-3);padding:6px 12px;border-radius:6px;">Shared Storage<br><strong style="color:var(--text-primary);">One copy</strong></div>
+      </div>
+    </div>
+
+    <!-- Step 2: After branching -->
+    <div class="card mb-16">
+      <div class="card-title" style="color:var(--info);">Step 2: Create Branch (instant, zero bytes copied)</div>
+      <p style="color:var(--text-secondary);margin:8px 0 16px;">Both branches point to the <strong>exact same physical pages</strong>. No data moves. No data is duplicated. Just a new pointer.</p>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <!-- Production row -->
+        <div style="display:flex;align-items:center;gap:16px;">
+          <div style="min-width:100px;text-align:center;">
+            <div style="background:var(--surface-3);border-radius:8px;padding:8px 16px;border:1px solid var(--neon);display:inline-block;">
+              <div style="font-family:'Space Mono',monospace;font-size:12px;color:var(--neon);">Production</div>
+            </div>
+          </div>
+          <div style="color:var(--text-muted);">&#8594;</div>
+          <div style="display:flex;gap:4px;">
+            <span style="background:var(--neon);color:#0A0A0A;padding:3px 7px;border-radius:4px;font-family:'Space Mono',monospace;font-size:11px;font-weight:600;">A</span>
+            <span style="background:var(--neon);color:#0A0A0A;padding:3px 7px;border-radius:4px;font-family:'Space Mono',monospace;font-size:11px;font-weight:600;">B</span>
+            <span style="background:var(--neon);color:#0A0A0A;padding:3px 7px;border-radius:4px;font-family:'Space Mono',monospace;font-size:11px;font-weight:600;">C</span>
+            <span style="background:var(--neon);color:#0A0A0A;padding:3px 7px;border-radius:4px;font-family:'Space Mono',monospace;font-size:11px;font-weight:600;">D</span>
+            <span style="background:var(--neon);color:#0A0A0A;padding:3px 7px;border-radius:4px;font-family:'Space Mono',monospace;font-size:11px;font-weight:600;">E</span>
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);">&#8593; shared</div>
+        </div>
+        <!-- Dev row -->
+        <div style="display:flex;align-items:center;gap:16px;">
+          <div style="min-width:100px;text-align:center;">
+            <div style="background:var(--surface-3);border-radius:8px;padding:8px 16px;border:1px solid var(--info);display:inline-block;">
+              <div style="font-family:'Space Mono',monospace;font-size:12px;color:var(--info);">Dev</div>
+            </div>
+          </div>
+          <div style="color:var(--text-muted);">&#8594;</div>
+          <div style="display:flex;gap:4px;">
+            <span style="background:var(--neon);color:#0A0A0A;padding:3px 7px;border-radius:4px;font-family:'Space Mono',monospace;font-size:11px;font-weight:600;">A</span>
+            <span style="background:var(--neon);color:#0A0A0A;padding:3px 7px;border-radius:4px;font-family:'Space Mono',monospace;font-size:11px;font-weight:600;">B</span>
+            <span style="background:var(--neon);color:#0A0A0A;padding:3px 7px;border-radius:4px;font-family:'Space Mono',monospace;font-size:11px;font-weight:600;">C</span>
+            <span style="background:var(--neon);color:#0A0A0A;padding:3px 7px;border-radius:4px;font-family:'Space Mono',monospace;font-size:11px;font-weight:600;">D</span>
+            <span style="background:var(--neon);color:#0A0A0A;padding:3px 7px;border-radius:4px;font-family:'Space Mono',monospace;font-size:11px;font-weight:600;">E</span>
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);">&#8593; same pages!</div>
+        </div>
+        <div style="text-align:center;padding:8px;background:rgba(6,182,212,0.1);border-radius:8px;border:1px dashed var(--info);">
+          <span style="color:var(--info);font-weight:600;">Storage cost: 0 bytes</span>
+          <span style="color:var(--text-muted);"> &mdash; both branches share the same physical pages</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3: Copy-on-write -->
+    <div class="card mb-16">
+      <div class="card-title" style="color:var(--warning);">Step 3: Write to Branch (copy-on-write)</div>
+      <p style="color:var(--text-secondary);margin:8px 0 16px;">When you <code style="background:var(--surface-3);padding:2px 6px;border-radius:4px;">ALTER TABLE ADD COLUMN threat_score</code> on dev, only the <strong>changed pages</strong> are written as new versions. Everything else stays shared.</p>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <!-- Production row -->
+        <div style="display:flex;align-items:center;gap:16px;">
+          <div style="min-width:100px;text-align:center;">
+            <div style="background:var(--surface-3);border-radius:8px;padding:8px 16px;border:1px solid var(--neon);display:inline-block;">
+              <div style="font-family:'Space Mono',monospace;font-size:12px;color:var(--neon);">Production</div>
+            </div>
+          </div>
+          <div style="color:var(--text-muted);">&#8594;</div>
+          <div style="display:flex;gap:4px;">
+            <span style="background:var(--neon);color:#0A0A0A;padding:3px 7px;border-radius:4px;font-family:'Space Mono',monospace;font-size:11px;font-weight:600;">A</span>
+            <span style="background:var(--neon);color:#0A0A0A;padding:3px 7px;border-radius:4px;font-family:'Space Mono',monospace;font-size:11px;font-weight:600;">B</span>
+            <span style="background:var(--neon);color:#0A0A0A;padding:3px 7px;border-radius:4px;font-family:'Space Mono',monospace;font-size:11px;font-weight:600;">C</span>
+            <span style="background:var(--neon);color:#0A0A0A;padding:3px 7px;border-radius:4px;font-family:'Space Mono',monospace;font-size:11px;font-weight:600;">D</span>
+            <span style="background:var(--neon);color:#0A0A0A;padding:3px 7px;border-radius:4px;font-family:'Space Mono',monospace;font-size:11px;font-weight:600;">E</span>
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);">unchanged</div>
+        </div>
+        <!-- Dev row with modified pages -->
+        <div style="display:flex;align-items:center;gap:16px;">
+          <div style="min-width:100px;text-align:center;">
+            <div style="background:var(--surface-3);border-radius:8px;padding:8px 16px;border:1px solid var(--info);display:inline-block;">
+              <div style="font-family:'Space Mono',monospace;font-size:12px;color:var(--info);">Dev</div>
+            </div>
+          </div>
+          <div style="color:var(--text-muted);">&#8594;</div>
+          <div style="display:flex;gap:4px;align-items:center;">
+            <span style="background:var(--neon);color:#0A0A0A;padding:3px 7px;border-radius:4px;font-family:'Space Mono',monospace;font-size:11px;font-weight:600;">A</span>
+            <span style="background:var(--neon);color:#0A0A0A;padding:3px 7px;border-radius:4px;font-family:'Space Mono',monospace;font-size:11px;font-weight:600;">B</span>
+            <span style="background:var(--neon);color:#0A0A0A;padding:3px 7px;border-radius:4px;font-family:'Space Mono',monospace;font-size:11px;font-weight:600;">C</span>
+            <span style="background:var(--warning);color:#0A0A0A;padding:3px 7px;border-radius:4px;font-family:'Space Mono',monospace;font-size:11px;font-weight:600;border:2px solid var(--warning);">D'</span>
+            <span style="background:var(--neon);color:#0A0A0A;padding:3px 7px;border-radius:4px;font-family:'Space Mono',monospace;font-size:11px;font-weight:600;">E</span>
+            <span style="background:var(--warning);color:#0A0A0A;padding:3px 7px;border-radius:4px;font-family:'Space Mono',monospace;font-size:11px;font-weight:600;border:2px solid var(--warning);">F</span>
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);">D' = modified, F = new</div>
+        </div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;">
+          <div style="flex:1;min-width:200px;padding:12px;background:rgba(0,229,153,0.08);border-radius:8px;border-left:3px solid var(--neon);">
+            <div style="font-size:12px;color:var(--neon);font-weight:600;">Shared (free)</div>
+            <div style="font-size:11px;color:var(--text-secondary);">Pages A, B, C, E — identical across both branches. No duplication.</div>
+          </div>
+          <div style="flex:1;min-width:200px;padding:12px;background:rgba(245,158,11,0.08);border-radius:8px;border-left:3px solid var(--warning);">
+            <div style="font-size:12px;color:var(--warning);font-weight:600;">Branch-only (tiny cost)</div>
+            <div style="font-size:11px;color:var(--text-secondary);">Page D' (modified metadata) + Page F (new column data). Only changed pages cost storage.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Key takeaway -->
+    <div class="card" style="border:1px solid var(--neon);background:rgba(0,229,153,0.05);">
+      <div class="card-title" style="color:var(--neon);">Why This Matters for F5</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-top:12px;">
+        <div>
+          <div style="font-size:24px;font-weight:700;color:var(--neon);font-family:'Space Mono',monospace;">0 bytes</div>
+          <div style="font-size:12px;color:var(--text-secondary);">to create a branch of a 50K-row database</div>
+        </div>
+        <div>
+          <div style="font-size:24px;font-weight:700;color:var(--neon);font-family:'Space Mono',monospace;">&lt;1 sec</div>
+          <div style="font-size:12px;color:var(--text-secondary);">branch creation time, regardless of data size</div>
+        </div>
+        <div>
+          <div style="font-size:24px;font-weight:700;color:var(--neon);font-family:'Space Mono',monospace;">Full scale</div>
+          <div style="font-size:12px;color:var(--text-secondary);">test with production data, not a sample</div>
+        </div>
+        <div>
+          <div style="font-size:24px;font-weight:700;color:var(--neon);font-family:'Space Mono',monospace;">Isolated</div>
+          <div style="font-size:12px;color:var(--text-secondary);">changes on dev never touch production</div>
+        </div>
+      </div>
+      <p style="color:var(--text-secondary);margin-top:16px;font-size:13px;">
+        Each product group at F5 can get their own branch to test schema migrations, add new telemetry columns,
+        or prototype features — all against production-scale data, with zero risk and near-zero storage cost.
+        When ready, merge the changes to production.
+      </p>
+    </div>
+  </div>
 </section>
 
 <!-- ====================================================================
@@ -3078,6 +3242,24 @@ function showCreatePipelineModal() {
 /* ========================================================================
    BRANCHING
    ======================================================================== */
+function switchBranchTab(tab) {
+  document.getElementById('branch-panel-manage').style.display = tab === 'manage' ? '' : 'none';
+  document.getElementById('branch-panel-how').style.display = tab === 'how' ? '' : 'none';
+  const manageBtn = document.getElementById('branch-tab-manage');
+  const howBtn = document.getElementById('branch-tab-how');
+  if (tab === 'manage') {
+    manageBtn.style.borderBottom = '2px solid var(--neon)';
+    manageBtn.className = 'btn btn-sm';
+    howBtn.style.borderBottom = 'none';
+    howBtn.className = 'btn btn-sm btn-ghost';
+  } else {
+    howBtn.style.borderBottom = '2px solid var(--neon)';
+    howBtn.className = 'btn btn-sm';
+    manageBtn.style.borderBottom = 'none';
+    manageBtn.className = 'btn btn-sm btn-ghost';
+  }
+}
+
 async function loadBranches() {
   try {
     const data = await apiCall('GET', '/branches');
