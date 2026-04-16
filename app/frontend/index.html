@@ -4037,10 +4037,26 @@ function closeModal() {
 /* ========================================================================
    INITIALIZATION
    ======================================================================== */
+async function checkConnection() {
+  try {
+    const health = await apiCall('GET', '/health');
+    state.health = health;
+    updateConnectionStatus('connected');
+  } catch (e) {
+    updateConnectionStatus('disconnected');
+  }
+}
+
 function init() {
   initSidebar();
   restoreExplainers();
   renderQueryHistory();
+
+  // Check connection immediately on load (independent of page)
+  checkConnection();
+  // Re-check every 30 seconds
+  setInterval(checkConnection, 30000);
+
   loadOverview();
 
   // Set up query editor placeholder
