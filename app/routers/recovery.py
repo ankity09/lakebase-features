@@ -108,15 +108,17 @@ def read_demo_table():
 def take_snapshot():
     """Record the current timestamp as a snapshot (restore point)."""
     try:
-        _, rows, _ = execute_query(
+        # Use the DATABASE server's timestamp, not Python's — ensures WAL consistency
+        _, ts_rows, _ = execute_query("SELECT NOW() as ts")
+        _, count_rows, _ = execute_query(
             "SELECT COUNT(*) as cnt FROM appshield.recovery_demo"
         )
-        row_count = rows[0]["cnt"] if rows else 0
+        row_count = count_rows[0]["cnt"] if count_rows else 0
+        db_ts = str(ts_rows[0]["ts"]) if ts_rows else datetime.now(timezone.utc).isoformat()
         short_id = uuid.uuid4().hex[:8]
-        ts = datetime.now(timezone.utc).isoformat()
         return {
             "snapshot_id": f"snap-{short_id}",
-            "timestamp": ts,
+            "timestamp": db_ts,
             "row_count": row_count,
         }
     except Exception as e:
@@ -203,11 +205,31 @@ def restore_from_snapshot(body: RestoreRequest):
 
         # 5. Connect to restored branch and read the data
         logger.info("Connecting to restored branch at %s", restore_host)
+        # Wait a moment for the endpoint to be fully ready for queries
+        time.sleep(3)
         restore_conn = _connect_to_host(restore_host)
         try:
             with restore_conn.cursor() as cur:
-                cur.execute("SELECT customer, action, amount FROM appshield.recovery_demo ORDER BY id")
-                restored_rows = cur.fetchall()
+                # First check if the table exists on the restored branch
+                cur.execute("""
+                    SELECT table_name FROM information_schema.tables
+                    WHERE table_schema = 'appshield' AND table_name = 'recovery_demo'
+                """)
+                table_exists = cur.fetchone()
+                logger.info("recovery_demo exists on restored branch: %s", bool(table_exists))
+
+                if table_exists:
+                    cur.execute("SELECT customer, action, amount FROM appshield.recovery_demo ORDER BY id")
+                    restored_rows = cur.fetchall()
+                else:
+                    # Table might not exist if snapshot was before table creation
+                    logger.warning("recovery_demo table not found on restored branch — snapshot may be before table creation")
+                    restored_rows = []
+
+                # Also log what schemas/tables exist for debugging
+                cur.execute("SELECT table_schema, table_name FROM information_schema.tables WHERE table_schema = 'appshield' ORDER BY table_name")
+                all_tables = cur.fetchall()
+                logger.info("Tables on restored branch: %s", [f"{s}.{t}" for s, t in all_tables])
         finally:
             restore_conn.close()
 
