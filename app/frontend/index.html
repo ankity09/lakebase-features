@@ -3215,7 +3215,7 @@ async function deleteBranch(name) {
    ======================================================================== */
 async function loadAutoscaling() {
   try {
-    const data = await apiCall('GET', '/infrastructure/autoscaling');
+    const data = await apiCall('GET', '/autoscaling');
     renderAutoscaling(data);
   } catch (e) {
     renderAutoscaling({ current_cu: 2, min_cu: 1, max_cu: 4, memory_gib: 8 });
@@ -3253,7 +3253,7 @@ async function applyAutoscaling() {
     return;
   }
   try {
-    await apiCall('POST', '/infrastructure/autoscaling', { min_cu: min, max_cu: max });
+    await apiCall('PUT', '/autoscaling', { min_cu: min, max_cu: max });
     showToast(`Autoscaling updated: ${min}-${max} CU`, 'success');
     loadAutoscaling();
   } catch (e) {
@@ -3267,7 +3267,7 @@ async function applyAutoscaling() {
    ======================================================================== */
 async function loadScaleToZero() {
   try {
-    const data = await apiCall('GET', '/infrastructure/status');
+    const data = await apiCall('GET', '/endpoint/status');
     setScaleToZeroState(data.state || 'active');
   } catch (e) {
     setScaleToZeroState('active');
@@ -3295,7 +3295,7 @@ async function scaleToZeroSuspend() {
   showToast('Instance suspended', 'info');
 
   try {
-    await apiCall('POST', '/infrastructure/suspend', {});
+    await apiCall('POST', '/endpoint/suspend', {});
   } catch (e) { /* demo mode */ }
 }
 
@@ -3304,7 +3304,7 @@ async function scaleToZeroWake() {
   startStopwatch();
 
   try {
-    await apiCall('POST', '/infrastructure/resume', {});
+    await apiCall('POST', '/endpoint/resume', {});
     await new Promise(r => setTimeout(r, 1500 + Math.random() * 1500));
     setScaleToZeroState('active');
     stopStopwatch();
@@ -3355,7 +3355,7 @@ function clearStopwatch() {
    ======================================================================== */
 async function loadReplicas() {
   try {
-    const data = await apiCall('GET', '/infrastructure/endpoints');
+    const data = await apiCall('GET', '/replicas');
     renderReplicaEndpoints(data.endpoints || []);
   } catch (e) {
     renderReplicaEndpoints([
