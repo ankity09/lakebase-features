@@ -10,244 +10,161 @@ from app.services.lakebase_api import get_workspace_client, get_project_id
 router = APIRouter(prefix="/api", tags=["infrastructure"])
 logger = logging.getLogger(__name__)
 
-# ---- Mock state ----
+PROJECT = "lakebase-features"
+BRANCH = "production"
 
-_mock_autoscaling = {"min_cu": 2, "max_cu": 16, "current_cu": 4, "memory_gib": 16}
-_mock_endpoint_state = "ACTIVE"  # ACTIVE | SUSPENDED | STARTING
+
+def _api(method, path, body=None):
+    """Call Lakebase REST API via workspace client."""
+    w = get_workspace_client()
+    kwargs = {"body": body} if body else {}
+    return w.api_client.do(method, f"/api/2.0/postgres/{path}", **kwargs)
 
 
 class AutoscalingUpdateRequest(BaseModel):
-    min_cu: int
-    max_cu: int
+    min_cu: float
+    max_cu: float
 
 
 class ReplicaQueryRequest(BaseModel):
     sql: str
 
 
+# ── Autoscaling ──────────────────────────────────────────────────────
+
 @router.get("/autoscaling")
 def get_autoscaling():
-    """Get current autoscaling config."""
+    """Get current autoscaling config from the real Lakebase project."""
     try:
-        w = get_workspace_client()
-        project_id = get_project_id()
-        if project_id:
-            try:
-                config = w.lakebase.get_autoscaling(project_id=project_id)
-                return {
-                    "min_cu": getattr(config, "min_cu", 2),
-                    "max_cu": getattr(config, "max_cu", 16),
-                    "current_cu": getattr(config, "current_cu", None),
-                    "memory_gib": getattr(config, "memory_gib", None),
-                    "source": "sdk",
-                }
-            except Exception as sdk_err:
-                logger.warning("SDK autoscaling get failed, using mock: %s", sdk_err)
-    except Exception:
-        pass
-
-    return {**_mock_autoscaling, "source": "mock"}
+        ep = _api("GET", f"projects/{PROJECT}/branches/{BRANCH}/endpoints/primary")
+        spec = ep.get("spec", {})
+        status = ep.get("status", {})
+        return {
+            "min_cu": spec.get("autoscaling_limit_min_cu", 0),
+            "max_cu": spec.get("autoscaling_limit_max_cu", 0),
+            "current_cu": status.get("current_cu", spec.get("autoscaling_limit_min_cu", 0)),
+            "memory_gib": int(spec.get("autoscaling_limit_max_cu", 1)) * 4,
+            "source": "live",
+        }
+    except Exception as e:
+        logger.warning("Failed to get autoscaling config: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.put("/autoscaling")
 def update_autoscaling(body: AutoscalingUpdateRequest):
-    """Update autoscaling config."""
-    global _mock_autoscaling
-    if body.min_cu < 1:
-        raise HTTPException(status_code=400, detail="min_cu must be >= 1")
-    if body.max_cu < body.min_cu:
-        raise HTTPException(status_code=400, detail="max_cu must be >= min_cu")
-
+    """Update autoscaling config on the real endpoint."""
+    if body.min_cu > body.max_cu:
+        raise HTTPException(status_code=400, detail="min_cu cannot exceed max_cu")
     try:
-        w = get_workspace_client()
-        project_id = get_project_id()
-        if project_id:
-            try:
-                w.lakebase.update_autoscaling(
-                    project_id=project_id,
-                    min_cu=body.min_cu,
-                    max_cu=body.max_cu,
-                )
-                return {
-                    "min_cu": body.min_cu,
-                    "max_cu": body.max_cu,
-                    "state": "UPDATING",
-                    "source": "sdk",
-                }
-            except Exception as sdk_err:
-                logger.warning("SDK autoscaling update failed, simulating: %s", sdk_err)
-    except Exception:
-        pass
+        _api("PATCH", f"projects/{PROJECT}/branches/{BRANCH}/endpoints/primary", body={
+            "spec": {
+                "autoscaling_limit_min_cu": body.min_cu,
+                "autoscaling_limit_max_cu": body.max_cu,
+            },
+            "update_mask": "spec.autoscaling_limit_min_cu,spec.autoscaling_limit_max_cu",
+        })
+        return {"status": "updated", "min_cu": body.min_cu, "max_cu": body.max_cu}
+    except Exception as e:
+        logger.warning("Failed to update autoscaling: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
 
-    _mock_autoscaling["min_cu"] = body.min_cu
-    _mock_autoscaling["max_cu"] = body.max_cu
-    return {**_mock_autoscaling, "state": "UPDATED", "source": "mock"}
 
+# ── Scale to Zero ────────────────────────────────────────────────────
 
 @router.get("/endpoint/status")
-def endpoint_status():
-    """Get endpoint state (active/suspended/starting)."""
+def get_endpoint_status():
+    """Get real endpoint state."""
     try:
-        w = get_workspace_client()
-        project_id = get_project_id()
-        if project_id:
-            try:
-                status = w.lakebase.get_endpoint(project_id=project_id)
-                return {
-                    "state": getattr(status, "state", "UNKNOWN"),
-                    "name": getattr(status, "name", "primary"),
-                    "type": "r_w",
-                    "compute_units": getattr(status, "compute_units", None),
-                    "host": getattr(status, "host", None),
-                    "source": "sdk",
-                }
-            except Exception as sdk_err:
-                logger.warning("SDK endpoint status failed, using mock: %s", sdk_err)
-    except Exception:
-        pass
-
-    return {
-        "state": _mock_endpoint_state,
-        "name": "appshield-primary",
-        "type": "r_w",
-        "compute_units": _mock_autoscaling["current_cu"],
-        "host": "lakebase.example.databricks.com",
-        "source": "mock",
-    }
+        ep = _api("GET", f"projects/{PROJECT}/branches/{BRANCH}/endpoints/primary")
+        status = ep.get("status", {})
+        state = status.get("current_state", "UNKNOWN")
+        # Map Lakebase states to our UI states
+        state_map = {
+            "ACTIVE": "active",
+            "IDLE": "active",
+            "SUSPENDED": "suspended",
+            "SUSPENDING": "suspended",
+            "STARTING": "starting",
+            "CREATING": "starting",
+        }
+        return {
+            "name": "primary",
+            "state": state_map.get(state, state.lower()),
+            "raw_state": state,
+            "type": status.get("endpoint_type", "ENDPOINT_TYPE_READ_WRITE"),
+            "compute_units": status.get("current_cu"),
+            "host": status.get("hosts", {}).get("host", ""),
+        }
+    except Exception as e:
+        logger.warning("Failed to get endpoint status: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/endpoint/suspend")
 def suspend_endpoint():
-    """Trigger scale-to-zero / suspend."""
-    global _mock_endpoint_state
+    """Suspend the endpoint (scale to zero)."""
     try:
-        w = get_workspace_client()
-        project_id = get_project_id()
-        if project_id:
-            try:
-                w.lakebase.suspend_endpoint(project_id=project_id)
-                return {"state": "SUSPENDING", "source": "sdk"}
-            except Exception as sdk_err:
-                logger.warning("SDK suspend failed, simulating: %s", sdk_err)
-    except Exception:
-        pass
-
-    _mock_endpoint_state = "SUSPENDED"
-    return {
-        "state": "SUSPENDED",
-        "message": "Endpoint suspended (scale-to-zero). Resume with POST /api/endpoint/resume.",
-        "source": "mock",
-    }
+        _api("POST", f"projects/{PROJECT}/branches/{BRANCH}/endpoints/primary:suspend", body={})
+        return {"status": "suspending"}
+    except Exception as e:
+        logger.warning("Suspend failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/endpoint/resume")
 def resume_endpoint():
-    """Wake up a suspended endpoint."""
-    global _mock_endpoint_state
+    """Resume a suspended endpoint."""
     try:
-        w = get_workspace_client()
-        project_id = get_project_id()
-        if project_id:
-            try:
-                w.lakebase.resume_endpoint(project_id=project_id)
-                return {"state": "STARTING", "source": "sdk"}
-            except Exception as sdk_err:
-                logger.warning("SDK resume failed, simulating: %s", sdk_err)
-    except Exception:
-        pass
+        _api("POST", f"projects/{PROJECT}/branches/{BRANCH}/endpoints/primary:start", body={})
+        return {"status": "starting", "timestamp": datetime.now(timezone.utc).isoformat()}
+    except Exception as e:
+        logger.warning("Resume failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
 
-    _mock_endpoint_state = "ACTIVE"
-    return {
-        "state": "ACTIVE",
-        "message": "Endpoint resumed.",
-        "source": "mock",
-    }
 
+# ── Read Replicas ────────────────────────────────────────────────────
 
 @router.get("/replicas")
 def list_replicas():
-    """List all endpoints (R/W and R/O)."""
+    """List all endpoints (R/W and R/O) on the production branch."""
     try:
-        w = get_workspace_client()
-        project_id = get_project_id()
-        if project_id:
-            try:
-                endpoints = w.lakebase.list_endpoints(project_id=project_id)
-                result = []
-                for ep in endpoints:
-                    result.append({
-                        "name": getattr(ep, "name", "unknown"),
-                        "state": getattr(ep, "state", "UNKNOWN"),
-                        "type": getattr(ep, "type", "r_w"),
-                        "compute_units": getattr(ep, "compute_units", None),
-                        "host": getattr(ep, "host", None),
-                    })
-                return {"endpoints": result, "source": "sdk"}
-            except Exception as sdk_err:
-                logger.warning("SDK list endpoints failed, using mock: %s", sdk_err)
-    except Exception:
-        pass
-
-    return {
-        "endpoints": [
-            {
-                "name": "appshield-primary",
-                "state": _mock_endpoint_state,
-                "type": "r_w",
-                "compute_units": _mock_autoscaling["current_cu"],
-                "host": "primary.lakebase.example.com",
-            },
-            {
-                "name": "appshield-replica-1",
-                "state": "ACTIVE",
-                "type": "r_o",
-                "compute_units": 2,
-                "host": "replica-1.lakebase.example.com",
-            },
-        ],
-        "source": "mock",
-    }
+        resp = _api("GET", f"projects/{PROJECT}/branches/{BRANCH}/endpoints")
+        endpoints = []
+        for ep in resp.get("endpoints", []):
+            status = ep.get("status", {})
+            spec = ep.get("spec", {})
+            ep_type = status.get("endpoint_type", spec.get("endpoint_type", ""))
+            endpoints.append({
+                "name": ep.get("name", "").split("/")[-1],
+                "state": status.get("current_state", "UNKNOWN"),
+                "type": "r_w" if "READ_WRITE" in ep_type else "r_o",
+                "compute_units": spec.get("autoscaling_limit_max_cu"),
+                "host": status.get("hosts", {}).get("host", ""),
+            })
+        return {"endpoints": endpoints}
+    except Exception as e:
+        logger.warning("Failed to list replicas: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/replicas/compare-query")
 def compare_query(body: ReplicaQueryRequest):
-    """Run query on primary and simulate replica comparison."""
-    sql = body.sql.strip()
-    if not sql:
-        raise HTTPException(status_code=400, detail="SQL query cannot be empty")
-
+    """Run the same query and measure latency. For single-endpoint setups, run twice."""
     try:
-        # Run on primary (real connection)
-        start_primary = time.perf_counter()
-        columns, rows, primary_latency = execute_query(sql)
-        primary_wall = (time.perf_counter() - start_primary) * 1000
-
-        # Simulate replica query: run same query again with slight variance
-        start_replica = time.perf_counter()
-        _, replica_rows, replica_latency = execute_query(sql)
-        replica_wall = (time.perf_counter() - start_replica) * 1000
-        # Add some simulated network overhead for the replica
-        replica_overhead = random.uniform(0.5, 3.0)
-
+        cols1, rows1, lat1 = execute_query(body.sql)
+        cols2, rows2, lat2 = execute_query(body.sql)
         return {
             "primary": {
-                "name": "appshield-primary",
-                "type": "r_w",
-                "columns": columns,
-                "row_count": len(rows),
-                "latency_ms": round(primary_latency, 2),
-                "wall_time_ms": round(primary_wall, 2),
+                "latency_ms": round(lat1, 2),
+                "row_count": len(rows1),
+                "rows": rows1[:100],
             },
             "replica": {
-                "name": "appshield-replica-1",
-                "type": "r_o",
-                "columns": columns,
-                "row_count": len(replica_rows),
-                "latency_ms": round(replica_latency + replica_overhead, 2),
-                "wall_time_ms": round(replica_wall + replica_overhead, 2),
+                "latency_ms": round(lat2, 2),
+                "row_count": len(rows2),
+                "rows": rows2[:100],
             },
-            "rows_match": len(rows) == len(replica_rows),
-            "note": "Replica query is simulated via the same connection with added latency variance.",
         }
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
