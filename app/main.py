@@ -35,7 +35,7 @@ from app.routers import sync; app.include_router(sync.router)
 from app.routers import branching; app.include_router(branching.router)
 from app.routers import infrastructure; app.include_router(infrastructure.router)
 from app.routers import feature_store; app.include_router(feature_store.router)
-# from app.routers import pgvector; app.include_router(pgvector.router)
+from app.routers import pgvector; app.include_router(pgvector.router)
 from app.routers import monitoring; app.include_router(monitoring.router)
 
 # Serve vanilla frontend from app/frontend/
