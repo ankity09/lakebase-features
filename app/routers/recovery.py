@@ -156,11 +156,23 @@ def restore_from_snapshot(body: RestoreRequest):
 
     try:
         # 1. Create a PITR branch at the snapshot timestamp
-        logger.info("Creating PITR branch %s at %s", branch_name, body.snapshot_timestamp)
+        # Normalize timestamp to ISO format that Lakebase expects
+        raw_ts = body.snapshot_timestamp.strip()
+        # Convert "2026-04-16 19:46:07.875515+00:00" to "2026-04-16T19:46:07Z"
+        if " " in raw_ts and "T" not in raw_ts:
+            raw_ts = raw_ts.replace(" ", "T")
+        # Remove microseconds and timezone offset, add Z
+        if "." in raw_ts:
+            raw_ts = raw_ts.split(".")[0]
+        if "+" in raw_ts:
+            raw_ts = raw_ts.split("+")[0]
+        if not raw_ts.endswith("Z"):
+            raw_ts = raw_ts + "Z"
+        logger.info("Creating PITR branch %s at %s (raw: %s)", branch_name, raw_ts, body.snapshot_timestamp)
         _api("POST", f"projects/{PROJECT}/branches?branch_id={branch_name}", body={
             "spec": {
                 "source_branch": f"projects/{PROJECT}/branches/{BRANCH}",
-                "source_timestamp": body.snapshot_timestamp,
+                "source_timestamp": raw_ts,
                 "no_expiry": True,
             }
         })
@@ -219,8 +231,15 @@ def restore_from_snapshot(body: RestoreRequest):
                 logger.info("recovery_demo exists on restored branch: %s", bool(table_exists))
 
                 if table_exists:
-                    cur.execute("SELECT customer, action, amount FROM appshield.recovery_demo ORDER BY id")
+                    cur.execute("SELECT COUNT(*) FROM appshield.recovery_demo")
+                    count = cur.fetchone()[0]
+                    logger.info("recovery_demo row count on restored branch: %d", count)
+
+                    cur.execute("SELECT * FROM appshield.recovery_demo ORDER BY id")
                     restored_rows = cur.fetchall()
+                    # Extract just the columns we need (customer, action, amount) — skip id and created_at
+                    if restored_rows and len(restored_rows[0]) >= 4:
+                        restored_rows = [(r[1], r[2], r[3]) for r in restored_rows]
                 else:
                     # Table might not exist if snapshot was before table creation
                     logger.warning("recovery_demo table not found on restored branch — snapshot may be before table creation")
