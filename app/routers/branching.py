@@ -77,6 +77,113 @@ def delete_branch(name: str, confirm: bool = Query(False)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/branches/setup-demo")
+def setup_branch_demo():
+    """One-time setup: apply schema changes to dev and staging branches for demo.
+    Runs as the app SP which owns the tables."""
+
+    def _get_branch_host(branch_name):
+        resp = _api("GET", f"projects/{PROJECT}/branches/{branch_name}/endpoints")
+        eps = resp.get("endpoints", [])
+        if eps:
+            return eps[0].get("status", {}).get("hosts", {}).get("host", "")
+        return ""
+
+    def _run_on_branch(host, sqls):
+        password = os.environ.get("PGPASSWORD", "") or _generate_lakebase_token()
+        conn = psycopg2.connect(
+            host=host, port=int(os.environ.get("PGPORT", "5432")),
+            user=os.environ.get("PGUSER", ""),
+            password=password,
+            database=os.environ.get("PGDATABASE", "postgres"),
+            sslmode=os.environ.get("PGSSLMODE", "require"),
+        )
+        results = []
+        try:
+            conn.autocommit = True
+            with conn.cursor() as cur:
+                for sql in sqls:
+                    try:
+                        cur.execute(sql)
+                        results.append({"sql": sql[:80], "status": "ok"})
+                    except Exception as e:
+                        results.append({"sql": sql[:80], "status": f"error: {e}"})
+        finally:
+            conn.close()
+        return results
+
+    output = {}
+    try:
+        # DEV branch: new columns + threat_indicators table
+        dev_host = _get_branch_host("dev")
+        if dev_host:
+            dev_sqls = [
+                "ALTER TABLE appshield.telemetry_events ADD COLUMN IF NOT EXISTS threat_score FLOAT",
+                "ALTER TABLE appshield.telemetry_events ADD COLUMN IF NOT EXISTS geo_country VARCHAR(64)",
+                "ALTER TABLE appshield.telemetry_events ADD COLUMN IF NOT EXISTS device_fingerprint VARCHAR(128)",
+                "ALTER TABLE appshield.customer_features ADD COLUMN IF NOT EXISTS threat_level VARCHAR(20)",
+                "ALTER TABLE appshield.customer_features ADD COLUMN IF NOT EXISTS anomaly_score FLOAT",
+                """CREATE TABLE IF NOT EXISTS appshield.threat_indicators (
+                    indicator_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    indicator_type VARCHAR(32) NOT NULL,
+                    indicator_value TEXT NOT NULL,
+                    severity VARCHAR(16) DEFAULT 'medium',
+                    first_seen TIMESTAMPTZ DEFAULT NOW(),
+                    last_seen TIMESTAMPTZ DEFAULT NOW(),
+                    hit_count INT DEFAULT 0,
+                    source VARCHAR(64),
+                    is_active BOOLEAN DEFAULT true
+                )""",
+                """INSERT INTO appshield.threat_indicators (indicator_type, indicator_value, severity, source, hit_count)
+                SELECT * FROM (VALUES
+                    ('ip_blocklist', '203.0.113.0/24', 'critical', 'Threat Intel Feed', 1547),
+                    ('domain_suspicious', 'malware-c2.example.com', 'critical', 'Internal SOC', 89),
+                    ('user_agent_bot', 'BadBot/1.0', 'high', 'WAF Rules', 3201),
+                    ('geo_anomaly', 'Country: NK', 'high', 'GeoIP Database', 12),
+                    ('ssl_expired', 'cert-sha256:abc123...', 'medium', 'Certificate Monitor', 5),
+                    ('rate_limit_exceeded', 'customer:widget-inc', 'medium', 'Rate Limiter', 2890),
+                    ('cookie_injection', 'pattern:<script>', 'critical', 'WAF Rules', 445),
+                    ('path_traversal', '../../../etc/passwd', 'critical', 'WAF Rules', 67)
+                ) AS v(a,b,c,d,e)
+                WHERE NOT EXISTS (SELECT 1 FROM appshield.threat_indicators LIMIT 1)""",
+            ]
+            output["dev"] = _run_on_branch(dev_host, dev_sqls)
+        else:
+            output["dev"] = "no endpoint"
+
+        # STAGING branch: indexes + daily summary table
+        staging_host = _get_branch_host("staging")
+        if staging_host:
+            staging_sqls = [
+                "CREATE INDEX IF NOT EXISTS idx_telemetry_customer_time ON appshield.telemetry_events(customer_id, event_time DESC)",
+                "CREATE INDEX IF NOT EXISTS idx_telemetry_region_code ON appshield.telemetry_events(region, response_code)",
+                "CREATE INDEX IF NOT EXISTS idx_features_time ON appshield.customer_features(time_bucket DESC)",
+                """CREATE TABLE IF NOT EXISTS appshield.customer_daily_summary (
+                    customer_id VARCHAR(64),
+                    summary_date DATE,
+                    total_requests INT,
+                    unique_ips INT,
+                    avg_payload_bytes FLOAT,
+                    error_rate FLOAT,
+                    PRIMARY KEY (customer_id, summary_date)
+                )""",
+                """INSERT INTO appshield.customer_daily_summary (customer_id, summary_date, total_requests, unique_ips, avg_payload_bytes, error_rate)
+                SELECT customer_id, event_time::date, COUNT(*), COUNT(DISTINCT source_ip),
+                    AVG(payload_size_bytes), AVG(CASE WHEN response_code >= 400 THEN 1.0 ELSE 0.0 END)
+                FROM appshield.telemetry_events
+                GROUP BY customer_id, event_time::date
+                ON CONFLICT DO NOTHING""",
+            ]
+            output["staging"] = _run_on_branch(staging_host, staging_sqls)
+        else:
+            output["staging"] = "no endpoint"
+
+        return {"status": "done", "results": output}
+    except Exception as e:
+        logger.warning("Branch demo setup failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/branches/compare")
 def compare_branches(base: str = Query(...), target: str = Query(...)):
     """Deep schema diff between two branches — tables, columns, indexes."""
