@@ -2032,7 +2032,7 @@ code, pre, .mono { font-family: 'Space Mono', monospace; }
     <div id="recovery-steps" style="display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap;">
       <div class="recovery-step active" id="rstep-1" style="flex:1;min-width:120px;padding:12px;border-radius:8px;background:var(--surface-3);border:2px solid var(--neon);text-align:center;cursor:pointer;" onclick="scrollToRecoveryStep(1)">
         <div style="font-size:20px;">1</div>
-        <div style="font-size:11px;color:var(--text-secondary);">Create Table</div>
+        <div style="font-size:11px;color:var(--text-secondary);">Verify Data</div>
       </div>
       <div class="recovery-step" id="rstep-2" style="flex:1;min-width:120px;padding:12px;border-radius:8px;background:var(--surface-3);border:2px solid var(--surface-3);text-align:center;cursor:pointer;opacity:0.5;" onclick="scrollToRecoveryStep(2)">
         <div style="font-size:20px;">2</div>
@@ -2052,18 +2052,18 @@ code, pre, .mono { font-family: 'Space Mono', monospace; }
       </div>
     </div>
 
-    <!-- Step 1: Create -->
+    <!-- Step 1: Verify -->
     <div id="recovery-action-area">
       <div class="mb-16" id="recovery-step-1">
-        <div style="font-weight:600;color:var(--text-primary);margin-bottom:8px;">Step 1: Create a demo table with sample data</div>
-        <button class="btn btn-primary" onclick="recoveryCreateTable()">Create recovery_demo table (5 rows)</button>
+        <div style="font-weight:600;color:var(--text-primary);margin-bottom:8px;">Step 1: Verify model_predictions table (1,000 ML predictions)</div>
+        <button class="btn btn-primary" onclick="recoveryCreateTable()">Verify Table</button>
       </div>
     </div>
 
     <!-- Data display -->
-    <div class="section-title mt-24">Current Table State</div>
+    <div class="section-title mt-24">Current Table State — <code style="color:var(--neon);">model_predictions</code></div>
     <div id="recovery-table-display" style="color:var(--text-muted);padding:20px;text-align:center;">
-      Click "Create" to start the demo
+      Click "Verify Table" to start the demo
     </div>
 
     <!-- Snapshot info -->
@@ -3643,7 +3643,7 @@ function updateRecoverySteps(active) {
 function updateRecoveryActionArea() {
   const area = document.getElementById('recovery-action-area');
   if (_recoveryStep === 1) {
-    area.innerHTML = `<div class="mb-16"><div style="font-weight:600;color:var(--text-primary);margin-bottom:8px;">Step 1: Create a demo table with sample data</div><button class="btn btn-primary" onclick="recoveryCreateTable()">Create recovery_demo table (5 rows)</button></div>`;
+    area.innerHTML = `<div class="mb-16"><div style="font-weight:600;color:var(--text-primary);margin-bottom:8px;">Step 1: Verify model_predictions table (1,000 ML predictions)</div><button class="btn btn-primary" onclick="recoveryCreateTable()">Verify Table</button></div>`;
   } else if (_recoveryStep === 2) {
     area.innerHTML = `<div class="mb-16"><div style="font-weight:600;color:var(--text-primary);margin-bottom:8px;">Step 2: Take a snapshot (records the current timestamp)</div><button class="btn" style="border-color:var(--neon);color:var(--neon);" onclick="recoveryTakeSnapshot()">&#128247; Take Snapshot</button></div>`;
   } else if (_recoveryStep === 3) {
@@ -3681,7 +3681,7 @@ function renderRecoveryTable(rows) {
 async function recoveryCreateTable() {
   try {
     const data = await apiCall('POST', '/recovery/demo-table');
-    showToast(`Created recovery_demo with ${data.row_count} rows`, 'success');
+    showToast(`Verified model_predictions: ${data.row_count} rows`, 'success');
     const table = await apiCall('GET', '/recovery/demo-table');
     renderRecoveryTable(table.rows);
     _recoveryStep = 2;

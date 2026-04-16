@@ -18,16 +18,17 @@ logger = logging.getLogger(__name__)
 PROJECT = "lakebase-features"
 BRANCH = "production"
 
+# Use model_predictions table — it was created during seed and has stable data
+TABLE = "appshield.model_predictions"
+
 
 def _api(method, path, body=None):
-    """Call Lakebase REST API via workspace client."""
     w = get_workspace_client()
     kwargs = {"body": body} if body else {}
     return w.api_client.do(method, f"/api/2.0/postgres/{path}", **kwargs)
 
 
 def _connect_to_host(host):
-    """Open a fresh psycopg2 connection to a specific host."""
     password = os.environ.get("PGPASSWORD", "") or _generate_lakebase_token()
     return psycopg2.connect(
         host=host,
@@ -43,133 +44,103 @@ class RestoreRequest(BaseModel):
     snapshot_timestamp: str
 
 
-# ── Create / Reset Demo Table ───────────────────────────────────────
-
-@router.post("/recovery/demo-table")
-def create_demo_table():
-    """Create or reset the recovery demo table with sample data."""
-    try:
-        with get_conn() as conn:
-            conn.autocommit = True
-            with conn.cursor() as cur:
-                cur.execute("DROP TABLE IF EXISTS appshield.recovery_demo")
-                cur.execute("""
-                    CREATE TABLE appshield.recovery_demo (
-                        id SERIAL PRIMARY KEY,
-                        customer VARCHAR(64),
-                        action VARCHAR(128),
-                        amount DECIMAL(10,2),
-                        created_at TIMESTAMPTZ DEFAULT NOW()
-                    )
-                """)
-                cur.execute("""
-                    INSERT INTO appshield.recovery_demo (customer, action, amount) VALUES
-                        ('acme-corp', 'subscription_renewal', 299.99),
-                        ('globex-inc', 'feature_upgrade', 149.50),
-                        ('initech-systems', 'support_plan', 599.00),
-                        ('widget-co', 'data_export', 49.99),
-                        ('stark-industries', 'enterprise_license', 2499.00)
-                """)
-        return {"status": "created", "row_count": 5}
-    except Exception as e:
-        logger.warning("Failed to create demo table: %s", e)
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# ── Read Demo Table ─────────────────────────────────────────────────
+# ── Read Table State ───────────────────────────────────────────────
 
 @router.get("/recovery/demo-table")
 def read_demo_table():
-    """Read current state of the recovery demo table."""
+    """Read current state of model_predictions table."""
     try:
-        columns, rows, _ = execute_query(
-            "SELECT * FROM appshield.recovery_demo ORDER BY id"
+        _, rows, lat = execute_query(
+            f"SELECT prediction_id, customer_id, predicted_at, app_classification, confidence FROM {TABLE} ORDER BY predicted_at DESC LIMIT 20"
         )
-        # Convert Decimal to float for JSON serialization
+        _, count_rows, _ = execute_query(f"SELECT COUNT(*) as cnt FROM {TABLE}")
+        total = count_rows[0]["cnt"] if count_rows else 0
         for row in rows:
             for k, v in row.items():
                 if isinstance(v, Decimal):
                     row[k] = float(v)
                 elif isinstance(v, datetime):
                     row[k] = v.isoformat()
-        return {
-            "rows": rows,
-            "row_count": len(rows),
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }
+                elif hasattr(v, 'isoformat'):
+                    row[k] = str(v)
+        return {"rows": rows, "row_count": total, "showing": len(rows), "timestamp": datetime.now(timezone.utc).isoformat()}
     except Exception as e:
-        logger.warning("Failed to read demo table: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ── Take Snapshot ───────────────────────────────────────────────────
+# ── Setup (no-op for model_predictions — already exists) ──────────
+
+@router.post("/recovery/demo-table")
+def setup_demo_table():
+    """Verify model_predictions table exists and return row count."""
+    try:
+        _, rows, _ = execute_query(f"SELECT COUNT(*) as cnt FROM {TABLE}")
+        count = rows[0]["cnt"] if rows else 0
+        return {"status": "ready", "row_count": count, "table": TABLE}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Take Snapshot ──────────────────────────────────────────────────
 
 @router.post("/recovery/snapshot")
 def take_snapshot():
-    """Record the current timestamp as a snapshot (restore point)."""
+    """Record the current timestamp as a restore point."""
     try:
-        # Use the DATABASE server's timestamp minus 1 second to ensure WAL is fully flushed
-        _, ts_rows, _ = execute_query("SELECT (NOW() - INTERVAL '1 second') as ts")
-        _, count_rows, _ = execute_query(
-            "SELECT COUNT(*) as cnt FROM appshield.recovery_demo"
-        )
+        _, ts_rows, _ = execute_query("SELECT NOW() as ts")
+        _, count_rows, _ = execute_query(f"SELECT COUNT(*) as cnt FROM {TABLE}")
         row_count = count_rows[0]["cnt"] if count_rows else 0
         db_ts = str(ts_rows[0]["ts"]) if ts_rows else datetime.now(timezone.utc).isoformat()
-        logger.info("Snapshot timestamp (DB server - 1s): %s, row_count: %d", db_ts, row_count)
-        short_id = uuid.uuid4().hex[:8]
+        logger.info("Snapshot: %s, rows: %d", db_ts, row_count)
         return {
-            "snapshot_id": f"snap-{short_id}",
+            "snapshot_id": f"snap-{uuid.uuid4().hex[:8]}",
             "timestamp": db_ts,
             "row_count": row_count,
         }
     except Exception as e:
-        logger.warning("Failed to take snapshot: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ── Corrupt Data ────────────────────────────────────────────────────
+# ── Corrupt Data ───────────────────────────────────────────────────
 
 @router.post("/recovery/corrupt")
 def corrupt_data():
-    """Simulate data corruption by deleting all rows."""
+    """Simulate data corruption by deleting rows from model_predictions."""
     try:
-        _, rows, _ = execute_query(
-            "SELECT COUNT(*) as cnt FROM appshield.recovery_demo"
-        )
-        row_count = rows[0]["cnt"] if rows else 0
+        _, before, _ = execute_query(f"SELECT COUNT(*) as cnt FROM {TABLE}")
+        before_count = before[0]["cnt"] if before else 0
         with get_conn() as conn:
             with conn.cursor() as cur:
-                cur.execute("DELETE FROM appshield.recovery_demo")
-        return {"status": "corrupted", "rows_deleted": row_count}
+                cur.execute(f"DELETE FROM {TABLE}")
+        _, after, _ = execute_query(f"SELECT COUNT(*) as cnt FROM {TABLE}")
+        after_count = after[0]["cnt"] if after else 0
+        logger.info("Corrupted: deleted %d rows, %d remaining", before_count - after_count, after_count)
+        return {"status": "corrupted", "rows_deleted": before_count, "rows_remaining": after_count}
     except Exception as e:
-        logger.warning("Failed to corrupt data: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ── Restore from Snapshot ───────────────────────────────────────────
+# ── Restore from Snapshot ──────────────────────────────────────────
 
 @router.post("/recovery/restore")
 def restore_from_snapshot(body: RestoreRequest):
-    """Restore data from a snapshot timestamp using PITR branching."""
+    """Restore model_predictions from a PITR branch."""
     start_time = time.time()
-    short_id = uuid.uuid4().hex[:8]
-    branch_name = f"recovery-{short_id}"
+    branch_name = f"recovery-{uuid.uuid4().hex[:8]}"
 
     try:
-        # 1. Create a PITR branch at the snapshot timestamp
-        # Normalize timestamp to ISO format that Lakebase expects
+        # Normalize timestamp
         raw_ts = body.snapshot_timestamp.strip()
-        # Convert "2026-04-16 19:46:07.875515+00:00" to "2026-04-16T19:46:07Z"
         if " " in raw_ts and "T" not in raw_ts:
             raw_ts = raw_ts.replace(" ", "T")
-        # Remove microseconds and timezone offset, add Z
         if "." in raw_ts:
             raw_ts = raw_ts.split(".")[0]
         if "+" in raw_ts:
             raw_ts = raw_ts.split("+")[0]
         if not raw_ts.endswith("Z"):
             raw_ts = raw_ts + "Z"
-        logger.info("Creating PITR branch %s at %s (raw: %s)", branch_name, raw_ts, body.snapshot_timestamp)
+
+        logger.info("Creating PITR branch %s at %s", branch_name, raw_ts)
         _api("POST", f"projects/{PROJECT}/branches?branch_id={branch_name}", body={
             "spec": {
                 "source_branch": f"projects/{PROJECT}/branches/{BRANCH}",
@@ -178,100 +149,63 @@ def restore_from_snapshot(body: RestoreRequest):
             }
         })
 
-        # 2. Wait for branch to be READY
-        logger.info("Waiting for branch %s to be READY...", branch_name)
-        for _ in range(15):  # max 30 seconds
+        # Wait for READY
+        for _ in range(15):
             time.sleep(2)
             resp = _api("GET", f"projects/{PROJECT}/branches/{branch_name}")
-            state = resp.get("status", {}).get("current_state", "")
-            logger.info("Branch %s state: %s", branch_name, state)
-            if state == "READY":
+            if resp.get("status", {}).get("current_state") == "READY":
                 break
-        else:
-            raise Exception(f"Branch {branch_name} did not become READY within 30 seconds")
 
-        # 3. Find the auto-created endpoint on the branch (branches come with a default endpoint)
-        logger.info("Looking for endpoint on branch %s", branch_name)
+        # Find endpoint
         restore_host = None
-        for _ in range(20):  # max 60 seconds
+        for _ in range(20):
             time.sleep(3)
             try:
-                eps_resp = _api("GET", f"projects/{PROJECT}/branches/{branch_name}/endpoints")
-                endpoints = eps_resp.get("endpoints", [])
-                for ep in endpoints:
-                    ep_state = ep.get("status", {}).get("current_state", "")
-                    host = ep.get("status", {}).get("hosts", {}).get("host", "")
-                    ep_name = ep.get("name", "").split("/")[-1]
-                    logger.info("Endpoint %s state: %s host: %s", ep_name, ep_state, host[:30] if host else "none")
-                    if ep_state in ("ACTIVE", "IDLE") and host:
-                        restore_host = host
+                eps = _api("GET", f"projects/{PROJECT}/branches/{branch_name}/endpoints")
+                for ep in eps.get("endpoints", []):
+                    st = ep.get("status", {})
+                    if st.get("current_state") in ("ACTIVE", "IDLE") and st.get("hosts", {}).get("host"):
+                        restore_host = st["hosts"]["host"]
                         break
                 if restore_host:
                     break
-            except Exception as poll_err:
-                logger.warning("Polling endpoints: %s", poll_err)
-        else:
-            raise Exception(f"No active endpoint found on branch {branch_name} within 60 seconds")
+            except:
+                pass
 
         if not restore_host:
-            raise Exception("Endpoint became active but no host found")
+            raise Exception("No active endpoint on recovery branch")
 
-        # 5. Connect to restored branch and read the data
-        logger.info("Connecting to restored branch at %s", restore_host)
-        # Wait for the endpoint to be fully ready and WAL replay to complete
-        time.sleep(5)
+        # Read from restored branch
+        time.sleep(3)
+        logger.info("Reading from restored branch at %s", restore_host)
         restore_conn = _connect_to_host(restore_host)
         try:
             with restore_conn.cursor() as cur:
-                # First check if the table exists on the restored branch
-                cur.execute("""
-                    SELECT table_name FROM information_schema.tables
-                    WHERE table_schema = 'appshield' AND table_name = 'recovery_demo'
-                """)
-                table_exists = cur.fetchone()
-                logger.info("recovery_demo exists on restored branch: %s", bool(table_exists))
+                cur.execute(f"SELECT COUNT(*) FROM {TABLE}")
+                count = cur.fetchone()[0]
+                logger.info("Rows on restored branch: %d", count)
 
-                if table_exists:
-                    cur.execute("SELECT COUNT(*) FROM appshield.recovery_demo")
-                    count = cur.fetchone()[0]
-                    logger.info("recovery_demo row count on restored branch: %d", count)
-
-                    cur.execute("SELECT * FROM appshield.recovery_demo ORDER BY id")
-                    restored_rows = cur.fetchall()
-                    # Extract just the columns we need (customer, action, amount) — skip id and created_at
-                    if restored_rows and len(restored_rows[0]) >= 4:
-                        restored_rows = [(r[1], r[2], r[3]) for r in restored_rows]
-                else:
-                    # Table might not exist if snapshot was before table creation
-                    logger.warning("recovery_demo table not found on restored branch — snapshot may be before table creation")
-                    restored_rows = []
-
-                # Also log what schemas/tables exist for debugging
-                cur.execute("SELECT table_schema, table_name FROM information_schema.tables WHERE table_schema = 'appshield' ORDER BY table_name")
-                all_tables = cur.fetchall()
-                logger.info("Tables on restored branch: %s", [f"{s}.{t}" for s, t in all_tables])
+                cur.execute(f"SELECT customer_id, predicted_at, app_classification, confidence, features_used FROM {TABLE}")
+                restored_rows = cur.fetchall()
         finally:
             restore_conn.close()
 
-        logger.info("Read %d rows from restored branch", len(restored_rows))
-
-        # 6. Copy rows back to production
+        # Copy back to production
         if restored_rows:
             with get_conn() as conn:
                 with conn.cursor() as cur:
-                    for row in restored_rows:
+                    for r in restored_rows:
                         cur.execute(
-                            "INSERT INTO appshield.recovery_demo (customer, action, amount) VALUES (%s, %s, %s)",
-                            (row[0], row[1], row[2]),
+                            f"INSERT INTO {TABLE} (customer_id, predicted_at, app_classification, confidence, features_used) VALUES (%s, %s, %s, %s, %s)",
+                            (r[0], r[1], r[2], r[3], r[4]),
                         )
-            logger.info("Copied %d rows back to production", len(restored_rows))
+            logger.info("Restored %d rows to production", len(restored_rows))
 
-        # 7. Cleanup: delete the recovery branch
+        # Cleanup
         try:
             _api("DELETE", f"projects/{PROJECT}/branches/{branch_name}")
-            logger.info("Deleted recovery branch %s", branch_name)
-        except Exception as cleanup_err:
-            logger.warning("Failed to cleanup branch %s: %s", branch_name, cleanup_err)
+        except:
+            pass
 
         elapsed = round(time.time() - start_time, 1)
         return {
@@ -284,20 +218,17 @@ def restore_from_snapshot(body: RestoreRequest):
     except HTTPException:
         raise
     except Exception as e:
-        # Try to cleanup branch on failure
         try:
             _api("DELETE", f"projects/{PROJECT}/branches/{branch_name}")
-        except Exception:
+        except:
             pass
-        logger.warning("Restore failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ── Cleanup ─────────────────────────────────────────────────────────
+# ── Cleanup ────────────────────────────────────────────────────────
 
 @router.post("/recovery/cleanup")
 def cleanup_recovery_branches():
-    """Delete any leftover recovery branches."""
     try:
         resp = _api("GET", f"projects/{PROJECT}/branches")
         deleted = []
@@ -307,10 +238,8 @@ def cleanup_recovery_branches():
                 try:
                     _api("DELETE", f"projects/{PROJECT}/branches/{name}")
                     deleted.append(name)
-                    logger.info("Cleaned up recovery branch: %s", name)
-                except Exception as e:
-                    logger.warning("Failed to delete branch %s: %s", name, e)
-        return {"status": "cleaned", "deleted": deleted, "count": len(deleted)}
+                except:
+                    pass
+        return {"status": "cleaned", "deleted": deleted}
     except Exception as e:
-        logger.warning("Cleanup failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
