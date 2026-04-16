@@ -47,7 +47,7 @@ def list_branches():
 def create_branch(body: CreateBranchRequest):
     """Create a new branch from a parent."""
     try:
-        resp = _api("POST", f"projects/{PROJECT}/branches/{body.name}", body={
+        resp = _api("POST", f"projects/{PROJECT}/branches?branch_id={body.name}", body={
             "spec": {
                 "source_branch": f"projects/{PROJECT}/branches/{body.parent_branch}",
                 "no_expiry": True,

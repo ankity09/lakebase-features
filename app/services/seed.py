@@ -501,7 +501,7 @@ def seed_if_needed() -> None:
             if branch_name not in existing_names:
                 logger.info(f"Creating demo branch: {branch_name}")
                 try:
-                    w.api_client.do("POST", f"/api/2.0/postgres/projects/{PROJECT}/branches/{branch_name}", body={
+                    w.api_client.do("POST", f"/api/2.0/postgres/projects/{PROJECT}/branches?branch_id={branch_name}", body={
                         "spec": {
                             "source_branch": f"projects/{PROJECT}/branches/production",
                             "no_expiry": True,
@@ -523,7 +523,7 @@ def seed_if_needed() -> None:
         if "read-replica" not in endpoint_names:
             logger.info("Creating read-only endpoint: read-replica")
             try:
-                w.api_client.do("POST", f"/api/2.0/postgres/projects/{PROJECT}/branches/production/endpoints/read-replica", body={
+                w.api_client.do("POST", f"/api/2.0/postgres/projects/{PROJECT}/branches/production/endpoints?endpoint_id=read-replica", body={
                     "spec": {
                         "endpoint_type": "ENDPOINT_TYPE_READ_ONLY",
                         "autoscaling_limit_min_cu": 0.5,
