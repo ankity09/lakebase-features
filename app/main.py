@@ -49,7 +49,7 @@ from app.routers import feature_store; app.include_router(feature_store.router)
 from app.routers import pgvector; app.include_router(pgvector.router)
 from app.routers import monitoring; app.include_router(monitoring.router)
 
-# Serve vanilla frontend from app/frontend/
-frontend_dir = Path(__file__).parent / "frontend"
+# Serve React frontend from client/build/ (built by Vite)
+frontend_dir = Path(__file__).parent.parent / "client" / "build"
 if frontend_dir.exists():
     app.mount("/", StaticFiles(directory=str(frontend_dir), html=True), name="static")
