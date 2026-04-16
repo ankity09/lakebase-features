@@ -37,13 +37,14 @@ def get_autoscaling():
     """Get current autoscaling config from the real Lakebase project."""
     try:
         ep = _api("GET", f"projects/{PROJECT}/branches/{BRANCH}/endpoints/primary")
-        spec = ep.get("spec", {})
         status = ep.get("status", {})
+        min_cu = status.get("autoscaling_limit_min_cu", 0)
+        max_cu = status.get("autoscaling_limit_max_cu", 0)
         return {
-            "min_cu": spec.get("autoscaling_limit_min_cu", 0),
-            "max_cu": spec.get("autoscaling_limit_max_cu", 0),
-            "current_cu": status.get("current_cu", spec.get("autoscaling_limit_min_cu", 0)),
-            "memory_gib": int(spec.get("autoscaling_limit_max_cu", 1)) * 4,
+            "min_cu": min_cu,
+            "max_cu": max_cu,
+            "current_cu": status.get("current_cu", min_cu),
+            "memory_gib": int(max_cu) * 4,
             "source": "live",
         }
     except Exception as e:
