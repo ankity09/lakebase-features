@@ -29,16 +29,16 @@ app.add_middleware(
 
 from app.routers import health
 app.include_router(health.router)
-# Uncomment as routers are created:
-# from app.routers import crud; app.include_router(crud.router)
-# from app.routers import query; app.include_router(query.router)
-# from app.routers import sync; app.include_router(sync.router)
-# from app.routers import branching; app.include_router(branching.router)
-# from app.routers import infrastructure; app.include_router(infrastructure.router)
-# from app.routers import feature_store; app.include_router(feature_store.router)
+from app.routers import crud; app.include_router(crud.router)
+from app.routers import query; app.include_router(query.router)
+from app.routers import sync; app.include_router(sync.router)
+from app.routers import branching; app.include_router(branching.router)
+from app.routers import infrastructure; app.include_router(infrastructure.router)
+from app.routers import feature_store; app.include_router(feature_store.router)
 # from app.routers import pgvector; app.include_router(pgvector.router)
-# from app.routers import monitoring; app.include_router(monitoring.router)
+from app.routers import monitoring; app.include_router(monitoring.router)
 
-build_dir = Path(__file__).parent.parent / "client" / "build"
-if build_dir.exists():
-    app.mount("/", StaticFiles(directory=str(build_dir), html=True), name="static")
+# Serve vanilla frontend from app/frontend/
+frontend_dir = Path(__file__).parent / "frontend"
+if frontend_dir.exists():
+    app.mount("/", StaticFiles(directory=str(frontend_dir), html=True), name="static")
