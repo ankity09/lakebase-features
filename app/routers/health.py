@@ -14,6 +14,20 @@ def health():
     except Exception as e:
         raise HTTPException(status_code=503, detail=str(e))
 
+@router.get("/debug/env")
+def debug_env():
+    """Debug: show PG-related env vars (values masked)."""
+    pg_vars = {}
+    for key in sorted(os.environ.keys()):
+        if any(k in key.upper() for k in ["PG", "LAKEBASE", "DATABASE", "POSTGRES"]):
+            val = os.environ[key]
+            # Mask passwords
+            if "PASS" in key.upper() or "TOKEN" in key.upper() or "SECRET" in key.upper():
+                pg_vars[key] = f"{val[:8]}..." if len(val) > 8 else "***"
+            else:
+                pg_vars[key] = val
+    return {"env_vars": pg_vars, "pghost_set": bool(os.environ.get("PGHOST", ""))}
+
 
 @router.get("/overview/stats")
 def overview_stats():
