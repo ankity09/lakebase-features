@@ -108,13 +108,14 @@ def read_demo_table():
 def take_snapshot():
     """Record the current timestamp as a snapshot (restore point)."""
     try:
-        # Use the DATABASE server's timestamp, not Python's — ensures WAL consistency
-        _, ts_rows, _ = execute_query("SELECT NOW() as ts")
+        # Use the DATABASE server's timestamp minus 1 second to ensure WAL is fully flushed
+        _, ts_rows, _ = execute_query("SELECT (NOW() - INTERVAL '1 second') as ts")
         _, count_rows, _ = execute_query(
             "SELECT COUNT(*) as cnt FROM appshield.recovery_demo"
         )
         row_count = count_rows[0]["cnt"] if count_rows else 0
         db_ts = str(ts_rows[0]["ts"]) if ts_rows else datetime.now(timezone.utc).isoformat()
+        logger.info("Snapshot timestamp (DB server - 1s): %s, row_count: %d", db_ts, row_count)
         short_id = uuid.uuid4().hex[:8]
         return {
             "snapshot_id": f"snap-{short_id}",
@@ -217,8 +218,8 @@ def restore_from_snapshot(body: RestoreRequest):
 
         # 5. Connect to restored branch and read the data
         logger.info("Connecting to restored branch at %s", restore_host)
-        # Wait a moment for the endpoint to be fully ready for queries
-        time.sleep(3)
+        # Wait for the endpoint to be fully ready and WAL replay to complete
+        time.sleep(5)
         restore_conn = _connect_to_host(restore_host)
         try:
             with restore_conn.cursor() as cur:
