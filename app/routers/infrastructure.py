@@ -58,12 +58,12 @@ def update_autoscaling(body: AutoscalingUpdateRequest):
     if body.min_cu > body.max_cu:
         raise HTTPException(status_code=400, detail="min_cu cannot exceed max_cu")
     try:
-        _api("PATCH", f"projects/{PROJECT}/branches/{BRANCH}/endpoints/primary", body={
+        path = f"projects/{PROJECT}/branches/{BRANCH}/endpoints/primary?update_mask=spec.autoscaling_limit_min_cu,spec.autoscaling_limit_max_cu"
+        _api("PATCH", path, body={
             "spec": {
                 "autoscaling_limit_min_cu": body.min_cu,
                 "autoscaling_limit_max_cu": body.max_cu,
             },
-            "update_mask": "spec.autoscaling_limit_min_cu,spec.autoscaling_limit_max_cu",
         })
         return {"status": "updated", "min_cu": body.min_cu, "max_cu": body.max_cu}
     except Exception as e:
