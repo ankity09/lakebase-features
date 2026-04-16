@@ -69,7 +69,12 @@ def get_pool() -> pool.ThreadedConnectionPool | None:
 
         # If no password provided, generate an OAuth token
         if not pgpassword:
+            logger.info(f"No PGPASSWORD, attempting OAuth token generation. DATABRICKS_HOST={os.environ.get('DATABRICKS_HOST','')[:30]}, CLIENT_ID={os.environ.get('DATABRICKS_CLIENT_ID','')[:10]}...")
             pgpassword = _generate_lakebase_token()
+            if pgpassword:
+                logger.info(f"Got token ({len(pgpassword)} chars)")
+            else:
+                logger.warning("Failed to generate any token")
 
         conn_params = {
             "host": pghost,
