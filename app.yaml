@@ -7,24 +7,21 @@ command:
   - 8000
 env:
   - name: PGHOST
-    value: ""
+    valueFrom: resources.lakebase_db.host
   - name: PGPORT
-    value: "5432"
+    valueFrom: resources.lakebase_db.port
   - name: PGUSER
-    value: ""
+    valueFrom: resources.lakebase_db.user
   - name: PGPASSWORD
-    value: ""
+    valueFrom: resources.lakebase_db.password
   - name: PGDATABASE
-    value: "appshield"
-  - name: DATABRICKS_HOST
-    value: "https://fevm-serverless-stable-trvrmk.cloud.databricks.com"
-  - name: DATABRICKS_TOKEN
-    value: ""
-  - name: LAKEBASE_PROJECT_ID
-    value: ""
+    value: "postgres"
   - name: FMAPI_ENDPOINT
     value: "databricks-bge-small-en"
   - name: DELTA_CATALOG
     value: "appshield_catalog"
   - name: DELTA_SCHEMA
     value: "telemetry"
+resources:
+  - name: lakebase_db
+    type: lakebase
