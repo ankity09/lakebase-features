@@ -30,7 +30,9 @@ def debug_env():
                 pg_vars[key] = f"{val[:8]}..." if len(val) > 8 else "***"
             else:
                 pg_vars[key] = val
-    return {"env_vars": pg_vars, "pghost_set": bool(os.environ.get("PGHOST", ""))}
+    # Also show ALL env vars (names only, no values) for debugging
+    all_env_keys = sorted(os.environ.keys())
+    return {"env_vars": pg_vars, "pghost_set": bool(os.environ.get("PGHOST", "")), "all_env_keys": all_env_keys}
 
 
 @router.get("/overview/stats")
