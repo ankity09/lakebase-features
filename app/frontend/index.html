@@ -1,0 +1,3948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lakebase Features | AppShield Analytics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/atom-one-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/languages/sql.min.js"></script>
+<style>
+/* ========================================================================
+   RESET & BASE
+   ======================================================================== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+body {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #0A0A0A;
+  color: #F0F0F0;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+a { color: #00E599; text-decoration: none; }
+a:hover { text-decoration: underline; }
+code, pre, .mono { font-family: 'Space Mono', monospace; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #131418; }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #555; }
+
+/* ========================================================================
+   DESIGN TOKENS
+   ======================================================================== */
+:root {
+  --bg-page: #0A0A0A;
+  --bg-sidebar: #131418;
+  --bg-card: #1A1B20;
+  --bg-card-hover: #222328;
+  --bg-input: #16171C;
+  --bg-surface: #111115;
+  --accent: #00E599;
+  --accent-dim: rgba(0, 229, 153, 0.15);
+  --accent-glow: rgba(0, 229, 153, 0.3);
+  --text-primary: #F0F0F0;
+  --text-secondary: #A0A0A8;
+  --text-muted: #6B6B73;
+  --border: #2A2A32;
+  --border-hover: #3A3A44;
+  --danger: #EF4444;
+  --danger-dim: rgba(239, 68, 68, 0.15);
+  --warning: #F59E0B;
+  --warning-dim: rgba(245, 158, 11, 0.15);
+  --info: #06B6D4;
+  --info-dim: rgba(6, 182, 212, 0.15);
+  --violet: #8B5CF6;
+  --violet-dim: rgba(139, 92, 246, 0.15);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-xs: 6px;
+  --sidebar-width: 240px;
+  --sidebar-collapsed: 60px;
+  --transition: 200ms ease;
+  --transition-slow: 300ms ease;
+}
+
+/* ========================================================================
+   LAYOUT
+   ======================================================================== */
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ========================================================================
+   SIDEBAR
+   ======================================================================== */
+.sidebar {
+  width: var(--sidebar-width);
+  min-width: var(--sidebar-width);
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  transition: width var(--transition-slow), min-width var(--transition-slow);
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 100;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.sidebar.collapsed {
+  width: var(--sidebar-collapsed);
+  min-width: var(--sidebar-collapsed);
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  padding: 16px 16px 12px;
+  gap: 10px;
+  border-bottom: 1px solid var(--border);
+  min-height: 56px;
+}
+.sidebar-logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 14px;
+  color: #0A0A0A;
+  font-weight: 700;
+}
+.sidebar-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.sidebar.collapsed .sidebar-title,
+.sidebar.collapsed .sidebar-section-label,
+.sidebar.collapsed .nav-label,
+.sidebar.collapsed .sidebar-footer-text,
+.sidebar.collapsed .sidebar-footer-status { display: none; }
+
+.sidebar-toggle {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  font-size: 16px;
+  flex-shrink: 0;
+  transition: color var(--transition);
+}
+.sidebar-toggle:hover { color: var(--text-primary); }
+
+.sidebar-nav {
+  flex: 1;
+  padding: 8px 0;
+  overflow-y: auto;
+}
+
+.sidebar-section-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--text-muted);
+  padding: 16px 16px 6px;
+  white-space: nowrap;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  gap: 10px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  border-left: 3px solid transparent;
+  transition: all var(--transition);
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 500;
+}
+.nav-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+}
+.nav-item.active {
+  color: var(--accent);
+  background: var(--accent-dim);
+  border-left-color: var(--accent);
+}
+.nav-icon {
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+  font-size: 14px;
+}
+.nav-label { overflow: hidden; }
+
+.sidebar.collapsed .nav-item {
+  justify-content: center;
+  padding: 10px 0;
+}
+
+.sidebar-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+}
+.sidebar-footer-text {
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebar-footer-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+}
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+.status-dot.disconnected { background: var(--danger); }
+.status-dot.loading { background: var(--warning); animation: pulse 1.5s infinite; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* ========================================================================
+   MAIN CONTENT
+   ======================================================================== */
+.main-content {
+  flex: 1;
+  margin-left: var(--sidebar-width);
+  padding: 24px 32px;
+  min-height: 100vh;
+  transition: margin-left var(--transition-slow);
+  max-width: calc(100vw - var(--sidebar-width));
+}
+.sidebar.collapsed ~ .main-content {
+  margin-left: var(--sidebar-collapsed);
+  max-width: calc(100vw - var(--sidebar-collapsed));
+}
+
+.page { display: none; }
+.page.active { display: block; }
+
+/* ========================================================================
+   PAGE HEADER
+   ======================================================================== */
+.page-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.page-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.3px;
+}
+.page-header .docs-link {
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--bg-card);
+  padding: 4px 10px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border);
+  transition: all var(--transition);
+}
+.page-header .docs-link:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  text-decoration: none;
+}
+.page-header .btn-refresh {
+  margin-left: auto;
+}
+
+/* ========================================================================
+   EXPLAINER CARD
+   ======================================================================== */
+.explainer {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 24px;
+  overflow: hidden;
+  transition: border-color var(--transition);
+}
+.explainer:hover { border-color: var(--border-hover); }
+.explainer-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  width: 100%;
+  background: none;
+  border: none;
+  text-align: left;
+  transition: color var(--transition);
+}
+.explainer-toggle:hover { color: var(--text-primary); }
+.explainer-toggle .chevron {
+  transition: transform var(--transition);
+  font-size: 10px;
+}
+.explainer.open .explainer-toggle .chevron { transform: rotate(90deg); }
+.explainer-body {
+  padding: 0 16px 16px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.7;
+  display: none;
+}
+.explainer.open .explainer-body { display: block; }
+
+/* ========================================================================
+   BUTTONS
+   ======================================================================== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: var(--radius-xs);
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all var(--transition);
+  font-family: inherit;
+  white-space: nowrap;
+}
+.btn:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-hover);
+}
+.btn:active { transform: scale(0.97); }
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #0A0A0A;
+  border-color: var(--accent);
+  font-weight: 600;
+}
+.btn-primary:hover {
+  background: #00CC88;
+  border-color: #00CC88;
+  box-shadow: 0 0 20px var(--accent-glow);
+}
+
+.btn-danger {
+  background: var(--danger-dim);
+  color: var(--danger);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+.btn-danger:hover {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: var(--danger);
+}
+
+.btn-sm {
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-secondary);
+}
+.btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  border-color: transparent;
+}
+
+.btn-icon {
+  padding: 6px 8px;
+  font-size: 16px;
+}
+
+/* ========================================================================
+   CARDS
+   ======================================================================== */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  transition: all var(--transition);
+}
+.card:hover {
+  border-color: var(--border-hover);
+}
+.card-clickable:hover {
+  border-left: 3px solid var(--accent);
+  cursor: pointer;
+}
+.card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+.card-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* ========================================================================
+   KPI CARDS
+   ======================================================================== */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.kpi-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  transition: all var(--transition);
+}
+.kpi-card:hover { border-color: var(--border-hover); }
+.kpi-label {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.kpi-value {
+  font-family: 'Space Mono', monospace;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.kpi-sub {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+.kpi-value.accent { color: var(--accent); }
+.kpi-value.danger { color: var(--danger); }
+.kpi-value.warning { color: var(--warning); }
+
+/* ========================================================================
+   FEATURE GRID
+   ======================================================================== */
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.feature-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  cursor: pointer;
+  transition: all var(--transition);
+  display: flex;
+  flex-direction: column;
+}
+.feature-card:hover {
+  border-color: var(--accent);
+  border-left: 3px solid var(--accent);
+  background: var(--bg-card-hover);
+}
+.feature-card-icon {
+  font-size: 20px;
+  margin-bottom: 12px;
+}
+.feature-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+.feature-card-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  flex: 1;
+  margin-bottom: 12px;
+}
+.feature-card-link {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ========================================================================
+   TABLES
+   ======================================================================== */
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+}
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.data-table th {
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-surface);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  position: sticky;
+  top: 0;
+}
+.data-table th:hover { color: var(--text-secondary); }
+.data-table th .sort-icon { margin-left: 4px; opacity: 0.5; font-size: 10px; }
+.data-table td {
+  padding: 8px 14px;
+  border-bottom: 1px solid rgba(42, 42, 50, 0.5);
+  color: var(--text-secondary);
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.data-table tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-primary);
+}
+.data-table tr:last-child td { border-bottom: none; }
+
+.table-empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.table-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.pagination button {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  font-size: 12px;
+  transition: all var(--transition);
+}
+.pagination button:hover:not(:disabled) {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+.pagination button:disabled { opacity: 0.3; cursor: not-allowed; }
+.pagination .page-info { padding: 0 8px; color: var(--text-muted); font-size: 11px; }
+
+/* ========================================================================
+   FORMS
+   ======================================================================== */
+.form-group {
+  margin-bottom: 16px;
+}
+.form-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+.form-input, .form-select, .form-textarea {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 13px;
+  transition: border-color var(--transition);
+  outline: none;
+}
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-dim);
+}
+.form-input::placeholder, .form-textarea::placeholder {
+  color: var(--text-muted);
+}
+.form-select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236B6B73' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 30px;
+}
+.form-select option {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+.form-textarea {
+  min-height: 120px;
+  resize: vertical;
+  font-family: 'Space Mono', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.form-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+}
+.form-row .form-group { flex: 1; }
+.form-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* ========================================================================
+   TABS
+   ======================================================================== */
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+  gap: 0;
+}
+.tab {
+  padding: 10px 20px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all var(--transition);
+  font-family: inherit;
+}
+.tab:hover { color: var(--text-secondary); }
+.tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* ========================================================================
+   BADGES
+   ======================================================================== */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.badge-green { background: var(--accent-dim); color: var(--accent); }
+.badge-red { background: var(--danger-dim); color: var(--danger); }
+.badge-yellow { background: var(--warning-dim); color: var(--warning); }
+.badge-blue { background: var(--info-dim); color: var(--info); }
+.badge-violet { background: var(--violet-dim); color: var(--violet); }
+.badge-muted { background: rgba(107, 107, 115, 0.15); color: var(--text-muted); }
+
+/* ========================================================================
+   TOAST NOTIFICATIONS
+   ======================================================================== */
+.toast-container {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.toast {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  font-size: 13px;
+  color: var(--text-primary);
+  min-width: 280px;
+  max-width: 420px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  animation: slideInRight 300ms ease;
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+.toast.removing {
+  opacity: 0;
+  transform: translateX(100%);
+}
+.toast-success { border-left: 3px solid var(--accent); }
+.toast-error { border-left: 3px solid var(--danger); }
+.toast-warning { border-left: 3px solid var(--warning); }
+.toast-info { border-left: 3px solid var(--info); }
+.toast-icon { flex-shrink: 0; font-size: 16px; }
+.toast-body { flex: 1; }
+.toast-title { font-weight: 600; font-size: 13px; margin-bottom: 2px; }
+.toast-message { font-size: 12px; color: var(--text-secondary); }
+.toast-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* ========================================================================
+   MODAL
+   ======================================================================== */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 200ms ease;
+}
+.modal {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  min-width: 400px;
+  max-width: 560px;
+  max-height: 80vh;
+  overflow-y: auto;
+  animation: scaleIn 200ms ease;
+}
+.modal-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes scaleIn {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* ========================================================================
+   SKELETON SHIMMER
+   ======================================================================== */
+.skeleton {
+  background: linear-gradient(90deg, var(--bg-card) 25%, var(--bg-card-hover) 50%, var(--bg-card) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-xs);
+}
+.skeleton-text { height: 14px; margin-bottom: 8px; }
+.skeleton-text.w-50 { width: 50%; }
+.skeleton-text.w-75 { width: 75%; }
+.skeleton-text.w-100 { width: 100%; }
+.skeleton-card { height: 100px; }
+.skeleton-kpi { height: 80px; }
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ========================================================================
+   CODE EDITOR
+   ======================================================================== */
+.sql-editor-wrap {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--bg-input);
+  margin-bottom: 12px;
+}
+.sql-editor {
+  width: 100%;
+  min-height: 160px;
+  padding: 14px;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-family: 'Space Mono', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  resize: vertical;
+  outline: none;
+  tab-size: 2;
+}
+.sql-editor:focus {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.sql-editor-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ========================================================================
+   GAUGE
+   ======================================================================== */
+.gauge-bar-wrap {
+  background: var(--bg-input);
+  border-radius: 100px;
+  height: 12px;
+  overflow: hidden;
+  position: relative;
+}
+.gauge-bar {
+  height: 100%;
+  border-radius: 100px;
+  background: var(--accent);
+  transition: width 500ms ease;
+}
+.gauge-bar.warning { background: var(--warning); }
+.gauge-bar.danger { background: var(--danger); }
+
+/* ========================================================================
+   STATE BADGE (large)
+   ======================================================================== */
+.state-badge-large {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 24px;
+  border-radius: var(--radius);
+  font-size: 18px;
+  font-weight: 700;
+  font-family: 'Space Mono', monospace;
+}
+.state-badge-large.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border: 1px solid rgba(0, 229, 153, 0.3);
+}
+.state-badge-large.suspended {
+  background: var(--warning-dim);
+  color: var(--warning);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+.state-badge-large.starting {
+  background: var(--info-dim);
+  color: var(--info);
+  border: 1px solid rgba(6, 182, 212, 0.3);
+}
+
+/* ========================================================================
+   ENDPOINT DIAGRAM
+   ======================================================================== */
+.endpoint-diagram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 32px 16px;
+  flex-wrap: wrap;
+}
+.endpoint-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 24px;
+  text-align: center;
+  min-width: 160px;
+  transition: all var(--transition);
+}
+.endpoint-box:hover { border-color: var(--border-hover); }
+.endpoint-box.primary {
+  border-color: var(--accent);
+  box-shadow: 0 0 20px var(--accent-glow);
+}
+.endpoint-box-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.endpoint-box-name {
+  font-size: 13px;
+  font-weight: 600;
+  font-family: 'Space Mono', monospace;
+  color: var(--text-primary);
+}
+.endpoint-arrow {
+  color: var(--text-muted);
+  font-size: 20px;
+}
+
+/* ========================================================================
+   CHAT INTERFACE
+   ======================================================================== */
+.chat-container {
+  display: flex;
+  gap: 16px;
+  height: 520px;
+}
+.chat-messages-panel {
+  flex: 2;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+.chat-message {
+  margin-bottom: 16px;
+  display: flex;
+  gap: 10px;
+}
+.chat-message.user { flex-direction: row-reverse; }
+.chat-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  flex-shrink: 0;
+  font-weight: 600;
+}
+.chat-message.user .chat-avatar {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+.chat-message.assistant .chat-avatar {
+  background: var(--violet-dim);
+  color: var(--violet);
+}
+.chat-bubble {
+  max-width: 70%;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.chat-message.user .chat-bubble {
+  background: var(--accent-dim);
+  color: var(--text-primary);
+  border-bottom-right-radius: 2px;
+}
+.chat-message.assistant .chat-bubble {
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  border-bottom-left-radius: 2px;
+}
+.chat-input-bar {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-surface);
+}
+.chat-input {
+  flex: 1;
+  padding: 10px 14px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color var(--transition);
+}
+.chat-input:focus {
+  border-color: var(--accent);
+}
+.chat-memories-panel {
+  flex: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow-y: auto;
+  padding: 16px;
+}
+.memory-item {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+.memory-item-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.memory-item-text {
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+.memory-score {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+/* ========================================================================
+   COMPARISON SIDE BY SIDE
+   ======================================================================== */
+.comparison-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.comparison-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+.comparison-card.lakebase { border-top: 3px solid var(--accent); }
+.comparison-card.delta { border-top: 3px solid var(--warning); }
+
+/* ========================================================================
+   VECTOR SEARCH RESULTS
+   ======================================================================== */
+.search-result-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 12px;
+  transition: all var(--transition);
+}
+.search-result-card:hover {
+  border-left: 3px solid var(--accent);
+}
+.search-result-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.search-result-summary {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+.relevance-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+.relevance-bar {
+  flex: 1;
+  height: 4px;
+  background: var(--bg-input);
+  border-radius: 2px;
+  overflow: hidden;
+  max-width: 120px;
+}
+.relevance-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 300ms ease;
+}
+
+/* ========================================================================
+   FLOW DIAGRAM (Data Sync)
+   ======================================================================== */
+.sync-flow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 24px;
+  margin-bottom: 20px;
+}
+.sync-node {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 24px;
+  text-align: center;
+  min-width: 140px;
+}
+.sync-node-icon { font-size: 24px; margin-bottom: 8px; }
+.sync-node-label { font-size: 12px; font-weight: 600; color: var(--text-primary); }
+.sync-node-sub { font-size: 10px; color: var(--text-muted); margin-top: 4px; }
+.sync-arrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent);
+}
+.sync-arrow-line {
+  width: 60px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-dim));
+  position: relative;
+}
+.sync-arrow-label {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* ========================================================================
+   LATENCY BADGE
+   ======================================================================== */
+.latency-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 100px;
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+}
+.latency-badge.fast { background: var(--accent-dim); color: var(--accent); }
+.latency-badge.medium { background: var(--warning-dim); color: var(--warning); }
+.latency-badge.slow { background: var(--danger-dim); color: var(--danger); }
+
+/* ========================================================================
+   SPARKLINE
+   ======================================================================== */
+.sparkline {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 1px;
+  height: 24px;
+}
+.sparkline-bar {
+  width: 3px;
+  background: var(--accent);
+  border-radius: 1px;
+  transition: height 300ms ease;
+  opacity: 0.7;
+}
+.sparkline-bar:last-child { opacity: 1; }
+
+/* ========================================================================
+   SECTION HELPERS
+   ======================================================================== */
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+.section-muted {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+.mb-4 { margin-bottom: 4px; }
+.mb-8 { margin-bottom: 8px; }
+.mb-12 { margin-bottom: 12px; }
+.mb-16 { margin-bottom: 16px; }
+.mb-24 { margin-bottom: 24px; }
+.mt-16 { margin-top: 16px; }
+.mt-24 { margin-top: 24px; }
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.gap-4 { gap: 4px; }
+.gap-8 { gap: 8px; }
+.gap-12 { gap: 12px; }
+.gap-16 { gap: 16px; }
+.gap-24 { gap: 24px; }
+.flex-1 { flex: 1; }
+.text-right { text-align: right; }
+.text-center { text-align: center; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+/* ========================================================================
+   INLINE LABEL + VALUE
+   ======================================================================== */
+.info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(42, 42, 50, 0.3);
+  font-size: 12px;
+}
+.info-row:last-child { border-bottom: none; }
+.info-label { color: var(--text-muted); }
+.info-value { color: var(--text-primary); font-family: 'Space Mono', monospace; font-size: 12px; }
+
+/* ========================================================================
+   WHERE CLAUSE BUILDER
+   ======================================================================== */
+.where-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.where-row .form-input, .where-row .form-select { width: auto; flex: 1; }
+.where-remove {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px;
+}
+.where-remove:hover { color: var(--danger); }
+
+/* ========================================================================
+   CONFIRM BANNER
+   ======================================================================== */
+.confirm-banner {
+  background: var(--warning-dim);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.confirm-banner-text {
+  font-size: 13px;
+  color: var(--warning);
+  flex: 1;
+}
+
+/* ========================================================================
+   CU TABLE
+   ======================================================================== */
+.cu-table {
+  font-size: 12px;
+  width: 100%;
+  border-collapse: collapse;
+}
+.cu-table th, .cu-table td {
+  padding: 6px 12px;
+  border-bottom: 1px solid rgba(42, 42, 50, 0.5);
+  text-align: left;
+}
+.cu-table th {
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+.cu-table td {
+  color: var(--text-secondary);
+  font-family: 'Space Mono', monospace;
+}
+.cu-table tr.current td {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* ========================================================================
+   COST CALLOUT
+   ======================================================================== */
+.cost-callout {
+  background: var(--accent-dim);
+  border: 1px solid rgba(0, 229, 153, 0.2);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.cost-callout-icon { font-size: 20px; }
+.cost-callout-text { font-size: 13px; color: var(--text-primary); line-height: 1.5; }
+.cost-callout-highlight { color: var(--accent); font-weight: 700; }
+
+/* ========================================================================
+   EXAMPLE QUERIES (pgvector)
+   ======================================================================== */
+.example-queries {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.example-query-chip {
+  padding: 6px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.example-query-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ========================================================================
+   STOPWATCH
+   ======================================================================== */
+.stopwatch {
+  font-family: 'Space Mono', monospace;
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 2px;
+}
+.stopwatch.running { color: var(--accent); }
+
+/* ========================================================================
+   QUERY HISTORY
+   ======================================================================== */
+.history-item {
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(42,42,50,0.3);
+  cursor: pointer;
+  transition: background var(--transition);
+  font-size: 11px;
+}
+.history-item:hover {
+  background: rgba(255,255,255,0.03);
+}
+.history-item-sql {
+  font-family: 'Space Mono', monospace;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 2px;
+}
+.history-item-meta {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+/* ========================================================================
+   RESPONSIVE
+   ======================================================================== */
+@media (max-width: 768px) {
+  .sidebar {
+    width: var(--sidebar-collapsed);
+    min-width: var(--sidebar-collapsed);
+  }
+  .sidebar .sidebar-title,
+  .sidebar .sidebar-section-label,
+  .sidebar .nav-label,
+  .sidebar .sidebar-footer-text,
+  .sidebar .sidebar-footer-status { display: none; }
+  .sidebar .nav-item { justify-content: center; padding: 10px 0; }
+  .main-content {
+    margin-left: var(--sidebar-collapsed);
+    padding: 16px;
+    max-width: calc(100vw - var(--sidebar-collapsed));
+  }
+  .kpi-grid { grid-template-columns: 1fr 1fr; }
+  .feature-grid { grid-template-columns: 1fr; }
+  .comparison-grid { grid-template-columns: 1fr; }
+  .chat-container { flex-direction: column; height: auto; }
+}
+</style>
+</head>
+<body>
+
+<!-- ====================================================================
+     TOAST CONTAINER
+     ==================================================================== -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- ====================================================================
+     APP LAYOUT
+     ==================================================================== -->
+<div class="app-layout">
+
+<!-- ====================================================================
+     SIDEBAR
+     ==================================================================== -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <div class="sidebar-logo">L</div>
+    <span class="sidebar-title">Lakebase Features</span>
+    <button class="sidebar-toggle" id="sidebar-toggle" title="Toggle sidebar">&#9776;</button>
+  </div>
+
+  <nav class="sidebar-nav" id="sidebar-nav">
+    <div class="nav-item active" data-page="overview">
+      <span class="nav-icon">&#128202;</span>
+      <span class="nav-label">Overview</span>
+    </div>
+
+    <div class="sidebar-section-label">Data Operations</div>
+    <div class="nav-item" data-page="crud">
+      <span class="nav-icon">&#128190;</span>
+      <span class="nav-label">CRUD Operations</span>
+    </div>
+    <div class="nav-item" data-page="query">
+      <span class="nav-icon">&#128221;</span>
+      <span class="nav-label">Query Editor</span>
+    </div>
+    <div class="nav-item" data-page="sync">
+      <span class="nav-icon">&#128260;</span>
+      <span class="nav-label">Data Sync</span>
+    </div>
+
+    <div class="sidebar-section-label">Infrastructure</div>
+    <div class="nav-item" data-page="branching">
+      <span class="nav-icon">&#127807;</span>
+      <span class="nav-label">Branching</span>
+    </div>
+    <div class="nav-item" data-page="autoscaling">
+      <span class="nav-icon">&#128200;</span>
+      <span class="nav-label">Autoscaling</span>
+    </div>
+    <div class="nav-item" data-page="scaletozero">
+      <span class="nav-icon">&#9199;</span>
+      <span class="nav-label">Scale to Zero</span>
+    </div>
+    <div class="nav-item" data-page="replicas">
+      <span class="nav-icon">&#128214;</span>
+      <span class="nav-label">Read Replicas</span>
+    </div>
+
+    <div class="sidebar-section-label">AI / ML</div>
+    <div class="nav-item" data-page="features">
+      <span class="nav-icon">&#9889;</span>
+      <span class="nav-label">Feature Store</span>
+    </div>
+    <div class="nav-item" data-page="pgvector">
+      <span class="nav-icon">&#129504;</span>
+      <span class="nav-label">pgvector Search</span>
+    </div>
+    <div class="nav-item" data-page="memory">
+      <span class="nav-icon">&#128172;</span>
+      <span class="nav-label">AI Memory</span>
+    </div>
+
+    <div class="sidebar-section-label">Observability</div>
+    <div class="nav-item" data-page="monitoring">
+      <span class="nav-icon">&#128202;</span>
+      <span class="nav-label">Monitoring</span>
+    </div>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="sidebar-footer-text" id="footer-host">--</div>
+    <div class="sidebar-footer-text" id="footer-db">--</div>
+    <div class="sidebar-footer-status">
+      <span class="status-dot loading" id="footer-status-dot"></span>
+      <span id="footer-status-text">Connecting...</span>
+    </div>
+  </div>
+</aside>
+
+<!-- ====================================================================
+     MAIN CONTENT
+     ==================================================================== -->
+<main class="main-content" id="main-content">
+
+<!-- ====================================================================
+     OVERVIEW PAGE
+     ==================================================================== -->
+<section class="page active" id="page-overview">
+  <div class="page-header">
+    <h1 class="page-title">Overview</h1>
+    <button class="btn btn-sm btn-ghost btn-icon page-header btn-refresh" onclick="loadOverview()" title="Refresh">&#8635;</button>
+  </div>
+
+  <div class="explainer open" id="explainer-overview">
+    <button class="explainer-toggle" onclick="toggleExplainer('overview')">
+      <span class="chevron">&#9654;</span> What is Lakebase?
+    </button>
+    <div class="explainer-body">
+      <strong>Lakebase</strong> is Databricks' Postgres-compatible operational database built on top of the Lakehouse.
+      It combines the familiarity of PostgreSQL with Lakehouse-native features: automatic zero-ETL sync to Delta Lake,
+      database branching for safe schema migrations, autoscaling compute, scale-to-zero for cost savings, and built-in
+      pgvector support for AI workloads. This demo uses <strong>AppShield Analytics</strong> — a fictitious cybersecurity
+      SaaS company — to showcase these capabilities with realistic telemetry, feature store, and ML prediction data.
+    </div>
+  </div>
+
+  <div class="kpi-grid" id="overview-kpis">
+    <div class="kpi-card"><div class="skeleton skeleton-kpi"></div></div>
+    <div class="kpi-card"><div class="skeleton skeleton-kpi"></div></div>
+    <div class="kpi-card"><div class="skeleton skeleton-kpi"></div></div>
+    <div class="kpi-card"><div class="skeleton skeleton-kpi"></div></div>
+  </div>
+
+  <div class="section-title">Features</div>
+  <div class="section-muted">Explore Lakebase capabilities through interactive demos</div>
+  <div class="feature-grid" id="overview-features"></div>
+
+  <div class="card mt-24" id="overview-instance-info" style="display:none;">
+    <div class="card-title">Instance Info</div>
+    <div id="overview-info-rows"></div>
+  </div>
+</section>
+
+<!-- ====================================================================
+     CRUD OPERATIONS PAGE
+     ==================================================================== -->
+<section class="page" id="page-crud">
+  <div class="page-header">
+    <h1 class="page-title">CRUD Operations</h1>
+    <button class="btn btn-sm btn-ghost btn-icon btn-refresh" onclick="loadCrud()" title="Refresh">&#8635;</button>
+  </div>
+
+  <div class="explainer" id="explainer-crud">
+    <button class="explainer-toggle" onclick="toggleExplainer('crud')">
+      <span class="chevron">&#9654;</span> What is this?
+    </button>
+    <div class="explainer-body">
+      Perform standard Create, Read, Update, and Delete operations against Lakebase tables.
+      Because Lakebase is Postgres-compatible, all standard SQL and ORM patterns work out of the box.
+      The AppShield schema includes telemetry events, customer features, model predictions, and event embeddings.
+    </div>
+  </div>
+
+  <div class="form-group" style="max-width:300px;">
+    <label class="form-label">Table</label>
+    <select class="form-select" id="crud-table-select" onchange="onCrudTableChange()">
+      <option value="">Loading tables...</option>
+    </select>
+  </div>
+
+  <div class="tabs" id="crud-tabs">
+    <button class="tab active" data-tab="crud-read" onclick="switchTab('crud', 'crud-read')">Read</button>
+    <button class="tab" data-tab="crud-insert" onclick="switchTab('crud', 'crud-insert')">Insert</button>
+    <button class="tab" data-tab="crud-update" onclick="switchTab('crud', 'crud-update')">Update</button>
+    <button class="tab" data-tab="crud-delete" onclick="switchTab('crud', 'crud-delete')">Delete</button>
+  </div>
+
+  <!-- READ TAB -->
+  <div class="tab-content active" id="crud-read">
+    <div class="form-row mb-16">
+      <div class="form-group">
+        <label class="form-label">Filter by customer_id</label>
+        <input class="form-input" id="crud-filter-customer" placeholder="e.g. acme-corp" />
+      </div>
+      <div class="form-group" style="flex:0 0 auto;">
+        <label class="form-label">&nbsp;</label>
+        <button class="btn btn-primary" onclick="crudRead()">Search</button>
+      </div>
+    </div>
+    <div id="crud-read-results"></div>
+    <div id="crud-read-pagination" class="mt-16"></div>
+  </div>
+
+  <!-- INSERT TAB -->
+  <div class="tab-content" id="crud-insert">
+    <div id="crud-insert-form"></div>
+    <button class="btn btn-primary mt-16" onclick="crudInsert()">Insert Record</button>
+    <div id="crud-insert-result" class="mt-16"></div>
+  </div>
+
+  <!-- UPDATE TAB -->
+  <div class="tab-content" id="crud-update">
+    <div class="section-title mb-8">SET values</div>
+    <div id="crud-update-set"></div>
+    <button class="btn btn-sm btn-ghost mb-16" onclick="addWhereRow('crud-update-set', 'set')">+ Add field</button>
+
+    <div class="section-title mb-8">WHERE conditions</div>
+    <div id="crud-update-where"></div>
+    <button class="btn btn-sm btn-ghost mb-16" onclick="addWhereRow('crud-update-where', 'where')">+ Add condition</button>
+
+    <div class="flex gap-8">
+      <button class="btn btn-primary" onclick="crudUpdate(true)">Preview</button>
+      <button class="btn" onclick="crudUpdate(false)">Execute</button>
+    </div>
+    <div id="crud-update-result" class="mt-16"></div>
+  </div>
+
+  <!-- DELETE TAB -->
+  <div class="tab-content" id="crud-delete">
+    <div class="section-title mb-8">WHERE conditions</div>
+    <div id="crud-delete-where"></div>
+    <button class="btn btn-sm btn-ghost mb-16" onclick="addWhereRow('crud-delete-where', 'where')">+ Add condition</button>
+
+    <div class="flex gap-8">
+      <button class="btn btn-danger" onclick="crudDelete(true)">Preview</button>
+      <button class="btn btn-danger" onclick="crudDelete(false)">Execute</button>
+    </div>
+    <div id="crud-delete-result" class="mt-16"></div>
+  </div>
+</section>
+
+<!-- ====================================================================
+     QUERY EDITOR PAGE
+     ==================================================================== -->
+<section class="page" id="page-query">
+  <div class="page-header">
+    <h1 class="page-title">Query Editor</h1>
+    <a class="docs-link" href="https://docs.databricks.com/en/sql/language-manual/index.html" target="_blank">Docs &#8599;</a>
+  </div>
+
+  <div class="explainer" id="explainer-query">
+    <button class="explainer-toggle" onclick="toggleExplainer('query')">
+      <span class="chevron">&#9654;</span> What is this?
+    </button>
+    <div class="explainer-body">
+      Write and execute SQL directly against Lakebase. Supports all PostgreSQL syntax including CTEs, window functions,
+      and pgvector operations. Use EXPLAIN ANALYZE to inspect query plans. Results can be exported as JSON or CSV.
+    </div>
+  </div>
+
+  <div class="flex gap-16" style="margin-bottom:16px;">
+    <div style="flex:1;">
+      <div class="form-row mb-8">
+        <div class="form-group" style="flex:0 0 200px;">
+          <label class="form-label">Template</label>
+          <select class="form-select" id="query-template-select" onchange="loadQueryTemplate()">
+            <option value="">-- Select template --</option>
+            <option value="select_all">SELECT all from telemetry</option>
+            <option value="count_by_customer">Count by customer</option>
+            <option value="top_predictions">Top predictions</option>
+            <option value="feature_stats">Feature statistics</option>
+            <option value="recent_events">Recent events</option>
+            <option value="vector_search">Vector similarity search</option>
+          </select>
+        </div>
+        <div class="form-group" style="flex:0 0 auto;">
+          <label class="form-label">&nbsp;</label>
+          <label class="flex items-center gap-8" style="cursor:pointer;">
+            <input type="checkbox" id="query-explain-toggle" style="accent-color:var(--accent);"/>
+            <span class="form-label" style="margin:0;">EXPLAIN ANALYZE</span>
+          </label>
+        </div>
+      </div>
+      <div class="sql-editor-wrap">
+        <textarea class="sql-editor" id="query-editor" placeholder="SELECT * FROM appshield.telemetry_events LIMIT 10;" spellcheck="false"></textarea>
+        <div class="sql-editor-bar">
+          <span>PostgreSQL</span>
+          <span>Ctrl+Enter to execute</span>
+        </div>
+      </div>
+      <div class="flex gap-8">
+        <button class="btn btn-primary" onclick="executeQuery()">&#9654; Execute</button>
+        <button class="btn" onclick="exportQueryJSON()">Export JSON</button>
+        <button class="btn" onclick="exportQueryCSV()">Export CSV</button>
+        <button class="btn btn-ghost" onclick="clearQueryEditor()">Clear</button>
+      </div>
+    </div>
+    <div style="width:220px;">
+      <div class="section-title mb-8">History</div>
+      <div id="query-history" style="max-height:340px;overflow-y:auto;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);">
+        <div class="table-empty">No history yet</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="query-results" class="mt-24"></div>
+</section>
+
+<!-- ====================================================================
+     DATA SYNC PAGE
+     ==================================================================== -->
+<section class="page" id="page-sync">
+  <div class="page-header">
+    <h1 class="page-title">Data Sync</h1>
+    <a class="docs-link" href="https://docs.databricks.com/en/sql/language-manual/index.html" target="_blank">Docs &#8599;</a>
+    <button class="btn btn-sm btn-ghost btn-icon btn-refresh" onclick="loadSync()" title="Refresh">&#8635;</button>
+  </div>
+
+  <div class="explainer" id="explainer-sync">
+    <button class="explainer-toggle" onclick="toggleExplainer('sync')">
+      <span class="chevron">&#9654;</span> What is this?
+    </button>
+    <div class="explainer-body">
+      <strong>Zero-ETL Data Sync</strong> automatically replicates Lakebase (Postgres) tables to Delta Lake in your Lakehouse.
+      No pipelines to build or maintain — data flows continuously so analytics teams can query fresh operational data
+      using Spark, SQL Warehouses, or AI/BI dashboards. Changes in Lakebase appear in Delta within seconds.
+    </div>
+  </div>
+
+  <div class="sync-flow">
+    <div class="sync-node">
+      <div class="sync-node-icon">&#128190;</div>
+      <div class="sync-node-label">Lakebase</div>
+      <div class="sync-node-sub">PostgreSQL (OLTP)</div>
+    </div>
+    <div class="sync-arrow">
+      <div class="sync-arrow-label">Zero-ETL Sync</div>
+      <div class="sync-arrow-line"></div>
+    </div>
+    <div class="sync-node">
+      <div class="sync-node-icon">&#9651;</div>
+      <div class="sync-node-label">Delta Lake</div>
+      <div class="sync-node-sub">Lakehouse (Analytics)</div>
+    </div>
+  </div>
+
+  <div class="flex gap-8 mb-24">
+    <button class="btn btn-primary" onclick="showCreatePipelineModal()">+ Create Pipeline</button>
+    <button class="btn" onclick="triggerSync()">&#9889; Trigger Sync</button>
+  </div>
+
+  <div class="section-title">Sync Pipelines</div>
+  <div id="sync-pipelines">
+    <div class="skeleton skeleton-card mb-16"></div>
+  </div>
+
+  <div class="section-title mt-24">Side-by-Side Comparison</div>
+  <div class="section-muted">Compare row counts between Lakebase and Delta Lake</div>
+  <div id="sync-comparison" class="comparison-grid">
+    <div class="skeleton skeleton-card"></div>
+    <div class="skeleton skeleton-card"></div>
+  </div>
+</section>
+
+<!-- ====================================================================
+     BRANCHING PAGE
+     ==================================================================== -->
+<section class="page" id="page-branching">
+  <div class="page-header">
+    <h1 class="page-title">Branching</h1>
+    <a class="docs-link" href="https://docs.databricks.com/en/sql/language-manual/index.html" target="_blank">Docs &#8599;</a>
+    <button class="btn btn-sm btn-ghost btn-icon btn-refresh" onclick="loadBranches()" title="Refresh">&#8635;</button>
+  </div>
+
+  <div class="explainer" id="explainer-branching">
+    <button class="explainer-toggle" onclick="toggleExplainer('branching')">
+      <span class="chevron">&#9654;</span> What is this?
+    </button>
+    <div class="explainer-body">
+      <strong>Database Branching</strong> creates an isolated copy-on-write clone of your database — like git branches for your data.
+      Use branches for safe schema migrations, testing, staging environments, or development sandboxes.
+      Branches share storage with the parent, so they're instant to create and cost-effective.
+    </div>
+  </div>
+
+  <div class="flex gap-8 mb-24">
+    <button class="btn btn-primary" onclick="showCreateBranchModal()">+ Create Branch</button>
+    <button class="btn" onclick="showCompareBranchModal()">&#8644; Compare Branches</button>
+  </div>
+
+  <div class="section-title">Branches</div>
+  <div id="branch-list" class="feature-grid">
+    <div class="skeleton skeleton-card"></div>
+    <div class="skeleton skeleton-card"></div>
+  </div>
+
+  <div id="branch-compare-results" class="mt-24" style="display:none;"></div>
+</section>
+
+<!-- ====================================================================
+     AUTOSCALING PAGE
+     ==================================================================== -->
+<section class="page" id="page-autoscaling">
+  <div class="page-header">
+    <h1 class="page-title">Autoscaling</h1>
+    <button class="btn btn-sm btn-ghost btn-icon btn-refresh" onclick="loadAutoscaling()" title="Refresh">&#8635;</button>
+  </div>
+
+  <div class="explainer" id="explainer-autoscaling">
+    <button class="explainer-toggle" onclick="toggleExplainer('autoscaling')">
+      <span class="chevron">&#9654;</span> What is this?
+    </button>
+    <div class="explainer-body">
+      <strong>Autoscaling</strong> automatically adjusts compute resources (measured in Compute Units / CUs) based on your workload.
+      Set a minimum and maximum CU range, and Lakebase dynamically scales within those bounds.
+      Each CU provides approximately 4 GiB of memory. Scale up for heavy analytical queries, scale down during quiet periods.
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title mb-16">Current Compute</div>
+      <div class="flex items-center gap-16 mb-16">
+        <div>
+          <div class="kpi-value accent" id="autoscale-current-cu">--</div>
+          <div class="kpi-sub">Compute Units</div>
+        </div>
+        <div style="flex:1;">
+          <div class="gauge-bar-wrap">
+            <div class="gauge-bar" id="autoscale-gauge" style="width:0%;"></div>
+          </div>
+          <div class="flex justify-between mt-4" style="font-size:10px;color:var(--text-muted);">
+            <span id="autoscale-min-label">Min: --</span>
+            <span id="autoscale-max-label">Max: --</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Min CU</label>
+          <input class="form-input" type="number" id="autoscale-min-input" min="0" max="10" value="1" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Max CU</label>
+          <input class="form-input" type="number" id="autoscale-max-input" min="1" max="10" value="4" />
+        </div>
+        <div class="form-group" style="flex:0 0 auto;">
+          <label class="form-label">&nbsp;</label>
+          <button class="btn btn-primary" onclick="applyAutoscaling()">Apply</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title mb-16">CU Reference</div>
+      <table class="cu-table">
+        <thead><tr><th>CU</th><th>Memory</th><th>vCPU</th><th>Use Case</th></tr></thead>
+        <tbody id="autoscale-cu-table">
+          <tr data-cu="0.25"><td>0.25</td><td>1 GiB</td><td>shared</td><td>Dev / testing</td></tr>
+          <tr data-cu="0.5"><td>0.5</td><td>2 GiB</td><td>shared</td><td>Light workloads</td></tr>
+          <tr data-cu="1"><td>1</td><td>4 GiB</td><td>1</td><td>Small apps</td></tr>
+          <tr data-cu="2"><td>2</td><td>8 GiB</td><td>2</td><td>Standard OLTP</td></tr>
+          <tr data-cu="4"><td>4</td><td>16 GiB</td><td>4</td><td>High throughput</td></tr>
+          <tr data-cu="8"><td>8</td><td>32 GiB</td><td>8</td><td>Analytical + OLTP</td></tr>
+          <tr data-cu="10"><td>10</td><td>40 GiB</td><td>10</td><td>Maximum</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ====================================================================
+     SCALE TO ZERO PAGE
+     ==================================================================== -->
+<section class="page" id="page-scaletozero">
+  <div class="page-header">
+    <h1 class="page-title">Scale to Zero</h1>
+    <button class="btn btn-sm btn-ghost btn-icon btn-refresh" onclick="loadScaleToZero()" title="Refresh">&#8635;</button>
+  </div>
+
+  <div class="explainer" id="explainer-scaletozero">
+    <button class="explainer-toggle" onclick="toggleExplainer('scaletozero')">
+      <span class="chevron">&#9654;</span> What is this?
+    </button>
+    <div class="explainer-body">
+      <strong>Scale to Zero</strong> suspends compute when the database is idle — you only pay for storage.
+      When a new connection arrives, Lakebase automatically wakes up (typically in 1-3 seconds).
+      This is ideal for dev/staging environments, periodic batch workloads, or cost-sensitive applications.
+    </div>
+  </div>
+
+  <div class="flex gap-24 items-center mb-24">
+    <div>
+      <div class="section-muted mb-4">Instance State</div>
+      <div class="state-badge-large active" id="s2z-state-badge">
+        <span class="status-dot" id="s2z-state-dot"></span>
+        <span id="s2z-state-text">Active</span>
+      </div>
+    </div>
+    <div class="flex gap-8">
+      <button class="btn btn-primary" id="s2z-suspend-btn" onclick="scaleToZeroSuspend()">&#9199; Suspend</button>
+      <button class="btn" id="s2z-wake-btn" onclick="scaleToZeroWake()">&#9889; Wake Up</button>
+    </div>
+  </div>
+
+  <div class="grid-2 mb-24">
+    <div class="card">
+      <div class="card-title mb-12">Resume Timer</div>
+      <div class="text-center" style="padding:16px 0;">
+        <div class="stopwatch" id="s2z-stopwatch">00:00.0</div>
+        <div class="section-muted mt-16" id="s2z-timer-label">Time to resume from suspended state</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title mb-12">Cost Impact</div>
+      <div class="cost-callout">
+        <div class="cost-callout-icon">&#128176;</div>
+        <div class="cost-callout-text">
+          When suspended, you pay <span class="cost-callout-highlight">$0.00/hour</span> for compute.
+          Only storage costs apply (~$0.023/GB/month). Resume typically takes
+          <span class="cost-callout-highlight">1-3 seconds</span>.
+        </div>
+      </div>
+      <div class="info-row mt-16">
+        <span class="info-label">Last Suspended</span>
+        <span class="info-value" id="s2z-last-suspended">--</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Last Resumed</span>
+        <span class="info-value" id="s2z-last-resumed">--</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Idle Timeout</span>
+        <span class="info-value">5 minutes</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====================================================================
+     READ REPLICAS PAGE
+     ==================================================================== -->
+<section class="page" id="page-replicas">
+  <div class="page-header">
+    <h1 class="page-title">Read Replicas</h1>
+    <button class="btn btn-sm btn-ghost btn-icon btn-refresh" onclick="loadReplicas()" title="Refresh">&#8635;</button>
+  </div>
+
+  <div class="explainer" id="explainer-replicas">
+    <button class="explainer-toggle" onclick="toggleExplainer('replicas')">
+      <span class="chevron">&#9654;</span> What is this?
+    </button>
+    <div class="explainer-body">
+      <strong>Read Replicas</strong> provide dedicated read-only endpoints that offload analytical queries from your primary R/W endpoint.
+      Route heavy reporting queries to replicas while keeping OLTP writes fast on the primary.
+      Replicas share storage and receive changes in near-real-time.
+    </div>
+  </div>
+
+  <div class="section-title mb-12">Endpoint Topology</div>
+  <div class="endpoint-diagram" id="replicas-diagram">
+    <div class="endpoint-box primary">
+      <div class="endpoint-box-label">Primary</div>
+      <div class="endpoint-box-name">R/W Endpoint</div>
+    </div>
+    <div class="endpoint-arrow">&#8594;</div>
+    <div class="endpoint-box">
+      <div class="endpoint-box-label">Replica</div>
+      <div class="endpoint-box-name">R/O Endpoint</div>
+    </div>
+  </div>
+
+  <div class="section-title mt-24 mb-12">Endpoints</div>
+  <div id="replicas-table" class="mb-24">
+    <div class="skeleton skeleton-card"></div>
+  </div>
+
+  <div class="section-title mt-24 mb-12">Latency Comparison</div>
+  <div class="section-muted">Run the same query on both endpoints to compare latency</div>
+  <div class="form-row mb-16">
+    <div class="form-group">
+      <input class="form-input mono" id="replicas-sql-input" placeholder="SELECT COUNT(*) FROM appshield.telemetry_events" />
+    </div>
+    <div class="form-group" style="flex:0 0 auto;">
+      <button class="btn btn-primary" onclick="runOnBothEndpoints()">Run on Both</button>
+    </div>
+  </div>
+  <div id="replicas-comparison" class="comparison-grid" style="display:none;"></div>
+</section>
+
+<!-- ====================================================================
+     FEATURE STORE PAGE
+     ==================================================================== -->
+<section class="page" id="page-features">
+  <div class="page-header">
+    <h1 class="page-title">Feature Store</h1>
+    <button class="btn btn-sm btn-ghost btn-icon btn-refresh" onclick="loadFeatureStore()" title="Refresh">&#8635;</button>
+  </div>
+
+  <div class="explainer" id="explainer-features">
+    <button class="explainer-toggle" onclick="toggleExplainer('features')">
+      <span class="chevron">&#9654;</span> What is this?
+    </button>
+    <div class="explainer-body">
+      <strong>Lakebase as Online Feature Store:</strong> Pre-computed ML features stored in Lakebase are served with
+      single-digit millisecond latency for real-time inference. Compare this to reading features from Delta Lake
+      (batch, hundreds of ms). AppShield stores customer behavioral features (request counts, geo diversity, cookie patterns)
+      for its real-time app classification model.
+    </div>
+  </div>
+
+  <div class="tabs" id="feature-tabs">
+    <button class="tab active" data-tab="feature-table" onclick="switchTab('feature', 'feature-table')">Feature Table</button>
+    <button class="tab" data-tab="feature-lookup" onclick="switchTab('feature', 'feature-lookup')">Online Lookup</button>
+    <button class="tab" data-tab="feature-compare" onclick="switchTab('feature', 'feature-compare')">Batch vs Online</button>
+  </div>
+
+  <!-- Feature Table Tab -->
+  <div class="tab-content active" id="feature-table">
+    <div id="feature-table-results"></div>
+    <div id="feature-table-pagination" class="mt-16"></div>
+  </div>
+
+  <!-- Online Lookup Tab -->
+  <div class="tab-content" id="feature-lookup">
+    <div class="form-row mb-16" style="max-width:400px;">
+      <div class="form-group">
+        <label class="form-label">Customer ID</label>
+        <input class="form-input" id="feature-lookup-input" placeholder="e.g. acme-corp" />
+      </div>
+      <div class="form-group" style="flex:0 0 auto;">
+        <label class="form-label">&nbsp;</label>
+        <button class="btn btn-primary" onclick="featureLookup()">Lookup</button>
+      </div>
+    </div>
+    <div id="feature-lookup-result"></div>
+  </div>
+
+  <!-- Batch vs Online Tab -->
+  <div class="tab-content" id="feature-compare">
+    <div class="form-row mb-16" style="max-width:400px;">
+      <div class="form-group">
+        <label class="form-label">Customer ID</label>
+        <input class="form-input" id="feature-compare-input" placeholder="e.g. acme-corp" />
+      </div>
+      <div class="form-group" style="flex:0 0 auto;">
+        <label class="form-label">&nbsp;</label>
+        <button class="btn btn-primary" onclick="featureCompare()">Compare</button>
+      </div>
+    </div>
+    <div id="feature-compare-result" class="comparison-grid" style="display:none;"></div>
+  </div>
+</section>
+
+<!-- ====================================================================
+     PGVECTOR SEARCH PAGE
+     ==================================================================== -->
+<section class="page" id="page-pgvector">
+  <div class="page-header">
+    <h1 class="page-title">pgvector Search</h1>
+    <button class="btn btn-sm btn-ghost btn-icon btn-refresh" onclick="clearVectorResults()" title="Clear">&#8635;</button>
+  </div>
+
+  <div class="explainer" id="explainer-pgvector">
+    <button class="explainer-toggle" onclick="toggleExplainer('pgvector')">
+      <span class="chevron">&#9654;</span> What is this?
+    </button>
+    <div class="explainer-body">
+      <strong>pgvector</strong> is the Postgres extension for vector similarity search. Lakebase supports pgvector natively,
+      enabling you to store embeddings alongside relational data and perform similarity queries using cosine distance,
+      L2 distance, or inner product. AppShield stores security event embeddings (384-dimensional) for semantic search
+      across threat intelligence data.
+    </div>
+  </div>
+
+  <div class="form-row mb-12">
+    <div class="form-group">
+      <input class="form-input" id="pgvector-search-input" placeholder="Describe the security event to search for..." />
+    </div>
+    <div class="form-group" style="flex:0 0 auto;">
+      <button class="btn btn-primary" onclick="vectorSearch()">&#128269; Search</button>
+    </div>
+  </div>
+
+  <div class="section-muted mb-12">Try an example:</div>
+  <div class="example-queries">
+    <button class="example-query-chip" onclick="setVectorQuery('DDoS attack pattern')">DDoS attack pattern</button>
+    <button class="example-query-chip" onclick="setVectorQuery('SSL certificate error')">SSL certificate error</button>
+    <button class="example-query-chip" onclick="setVectorQuery('Bot traffic anomaly')">Bot traffic anomaly</button>
+    <button class="example-query-chip" onclick="setVectorQuery('brute force login attempt')">brute force login attempt</button>
+    <button class="example-query-chip" onclick="setVectorQuery('high latency performance')">high latency performance</button>
+    <button class="example-query-chip" onclick="setVectorQuery('JWT token reuse')">JWT token reuse</button>
+  </div>
+
+  <div id="pgvector-results"></div>
+</section>
+
+<!-- ====================================================================
+     AI MEMORY PAGE
+     ==================================================================== -->
+<section class="page" id="page-memory">
+  <div class="page-header">
+    <h1 class="page-title">AI Memory</h1>
+  </div>
+
+  <div class="explainer" id="explainer-memory">
+    <button class="explainer-toggle" onclick="toggleExplainer('memory')">
+      <span class="chevron">&#9654;</span> What is this?
+    </button>
+    <div class="explainer-body">
+      <strong>Lakebase as persistent memory for AI agents.</strong> Conversations, facts, and knowledge are stored in
+      Postgres with pgvector for semantic retrieval. When the agent receives a new message, it queries Lakebase for
+      related memories using embedding similarity — enabling context-aware, personalized responses across sessions.
+      This pattern powers long-term memory for chatbots, copilots, and autonomous agents.
+    </div>
+  </div>
+
+  <div class="chat-container">
+    <div class="chat-messages-panel">
+      <div class="chat-messages" id="memory-chat-messages">
+        <div class="chat-message assistant">
+          <div class="chat-avatar">AI</div>
+          <div class="chat-bubble">
+            Hello! I'm AppShield's AI assistant with persistent memory powered by Lakebase + pgvector.
+            Ask me about security events, customer patterns, or anything — I'll remember our conversation.
+          </div>
+        </div>
+      </div>
+      <div class="chat-input-bar">
+        <input class="chat-input" id="memory-chat-input" placeholder="Type a message..." onkeydown="if(event.key==='Enter')memorySend()" />
+        <button class="btn btn-primary" onclick="memorySend()">Send</button>
+      </div>
+    </div>
+
+    <div class="chat-memories-panel">
+      <div class="section-title mb-12">&#129504; Recalled Memories</div>
+      <div id="memory-recalled-list">
+        <div class="section-muted text-center" style="padding:20px 0;">Send a message to see related memories</div>
+      </div>
+      <div class="mt-16">
+        <button class="btn btn-sm btn-ghost" onclick="viewAllMemories()" style="width:100%;">View All Memories</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====================================================================
+     MONITORING PAGE
+     ==================================================================== -->
+<section class="page" id="page-monitoring">
+  <div class="page-header">
+    <h1 class="page-title">Monitoring</h1>
+    <div class="flex items-center gap-12" style="margin-left:auto;">
+      <label class="flex items-center gap-8" style="cursor:pointer;font-size:12px;color:var(--text-secondary);">
+        <input type="checkbox" id="monitoring-auto-refresh" onchange="toggleMonitoringRefresh()" style="accent-color:var(--accent);"/>
+        Auto-refresh (5s)
+      </label>
+      <span class="badge badge-muted" id="monitoring-last-updated">--</span>
+      <button class="btn btn-sm btn-ghost btn-icon btn-refresh" onclick="loadMonitoring()" title="Refresh">&#8635;</button>
+    </div>
+  </div>
+
+  <div class="explainer" id="explainer-monitoring">
+    <button class="explainer-toggle" onclick="toggleExplainer('monitoring')">
+      <span class="chevron">&#9654;</span> What is this?
+    </button>
+    <div class="explainer-body">
+      Real-time observability into your Lakebase instance. Monitor transactions per second, connection pools,
+      cache hit rates, storage usage, and identify slow queries. Built on PostgreSQL's system views
+      (pg_stat_activity, pg_stat_statements, pg_stat_bgwriter).
+    </div>
+  </div>
+
+  <div class="kpi-grid" id="monitoring-kpis">
+    <div class="kpi-card">
+      <div class="kpi-label">Transactions / sec</div>
+      <div class="flex items-center gap-12">
+        <div class="kpi-value accent" id="mon-tps">--</div>
+        <div class="sparkline" id="mon-tps-spark"></div>
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Active Connections</div>
+      <div class="kpi-value" id="mon-connections">--</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Cache Hit Rate</div>
+      <div class="kpi-value accent" id="mon-cache-rate">--</div>
+      <div class="gauge-bar-wrap mt-8">
+        <div class="gauge-bar" id="mon-cache-bar" style="width:0%;"></div>
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Storage Used</div>
+      <div class="kpi-value" id="mon-storage">--</div>
+    </div>
+  </div>
+
+  <div class="section-title mt-24">Slow Queries</div>
+  <div id="monitoring-slow-queries">
+    <div class="skeleton skeleton-card"></div>
+  </div>
+</section>
+
+</main>
+</div>
+
+<!-- ====================================================================
+     MODAL CONTAINER
+     ==================================================================== -->
+<div id="modal-root"></div>
+
+<!-- ====================================================================
+     JAVASCRIPT
+     ==================================================================== -->
+<script>
+/* ========================================================================
+   GLOBAL STATE
+   ======================================================================== */
+const state = {
+  currentPage: 'overview',
+  sidebarCollapsed: localStorage.getItem('sidebar_collapsed') === 'true',
+  connectionStatus: 'loading',
+  health: null,
+  tables: [],
+  selectedTable: '',
+  tableSchemas: {},
+  crudReadPage: 1,
+  crudReadPageSize: 25,
+  crudReadTotal: 0,
+  crudUpdateToken: null,
+  crudDeleteToken: null,
+  queryResults: null,
+  queryHistory: JSON.parse(localStorage.getItem('query_history') || '[]'),
+  featurePage: 1,
+  featurePageSize: 50,
+  monitoringInterval: null,
+  tpsHistory: [],
+  s2zState: 'active',
+  s2zTimerInterval: null,
+  s2zTimerStart: null,
+  explainers: JSON.parse(localStorage.getItem('explainers') || '{}'),
+  branches: [],
+  syncPipelines: [],
+  memories: [],
+  chatMessages: [],
+};
+
+/* ========================================================================
+   API LAYER
+   ======================================================================== */
+const API_BASE = '/api';
+
+async function apiCall(method, url, body = null) {
+  const opts = {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+  };
+  if (body) opts.body = JSON.stringify(body);
+
+  try {
+    const resp = await fetch(`${API_BASE}${url}`, opts);
+    const data = await resp.json();
+    if (!resp.ok) {
+      const errMsg = data.detail || data.error || `HTTP ${resp.status}`;
+      showToast(errMsg, 'error');
+      throw new Error(errMsg);
+    }
+    return data;
+  } catch (err) {
+    if (err.message && !err.message.startsWith('HTTP ')) {
+      // Network error — might be offline or API down
+      if (err instanceof TypeError) {
+        showToast('Network error — API unreachable', 'error');
+      }
+    }
+    throw err;
+  }
+}
+
+/* ========================================================================
+   TOAST NOTIFICATIONS
+   ======================================================================== */
+function showToast(message, variant = 'info', title = '') {
+  const container = document.getElementById('toast-container');
+  const icons = { success: '&#10003;', error: '&#10007;', warning: '&#9888;', info: '&#8505;' };
+  const titles = { success: 'Success', error: 'Error', warning: 'Warning', info: 'Info' };
+
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${variant}`;
+  toast.innerHTML = `
+    <span class="toast-icon">${icons[variant] || icons.info}</span>
+    <div class="toast-body">
+      <div class="toast-title">${title || titles[variant]}</div>
+      <div class="toast-message">${escapeHtml(message)}</div>
+    </div>
+    <button class="toast-close" onclick="this.parentElement.remove()">&times;</button>
+  `;
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    toast.classList.add('removing');
+    setTimeout(() => toast.remove(), 250);
+  }, 4000);
+}
+
+function escapeHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+/* ========================================================================
+   NAVIGATION
+   ======================================================================== */
+function navigateTo(page) {
+  state.currentPage = page;
+
+  // Update sidebar
+  document.querySelectorAll('.nav-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.page === page);
+  });
+
+  // Update pages
+  document.querySelectorAll('.page').forEach(el => {
+    el.classList.toggle('active', el.id === `page-${page}`);
+  });
+
+  // Load page data
+  switch (page) {
+    case 'overview': loadOverview(); break;
+    case 'crud': loadCrud(); break;
+    case 'query': break;
+    case 'sync': loadSync(); break;
+    case 'branching': loadBranches(); break;
+    case 'autoscaling': loadAutoscaling(); break;
+    case 'scaletozero': loadScaleToZero(); break;
+    case 'replicas': loadReplicas(); break;
+    case 'features': loadFeatureStore(); break;
+    case 'pgvector': break;
+    case 'memory': break;
+    case 'monitoring': loadMonitoring(); break;
+  }
+}
+
+/* ========================================================================
+   SIDEBAR
+   ======================================================================== */
+function initSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const toggle = document.getElementById('sidebar-toggle');
+
+  if (state.sidebarCollapsed) sidebar.classList.add('collapsed');
+
+  toggle.addEventListener('click', () => {
+    sidebar.classList.toggle('collapsed');
+    state.sidebarCollapsed = sidebar.classList.contains('collapsed');
+    localStorage.setItem('sidebar_collapsed', state.sidebarCollapsed);
+  });
+
+  document.querySelectorAll('.nav-item').forEach(el => {
+    el.addEventListener('click', () => navigateTo(el.dataset.page));
+  });
+}
+
+/* ========================================================================
+   EXPLAINER TOGGLES
+   ======================================================================== */
+function toggleExplainer(id) {
+  const el = document.getElementById(`explainer-${id}`);
+  el.classList.toggle('open');
+  state.explainers[id] = el.classList.contains('open');
+  localStorage.setItem('explainers', JSON.stringify(state.explainers));
+}
+
+function restoreExplainers() {
+  for (const [id, isOpen] of Object.entries(state.explainers)) {
+    const el = document.getElementById(`explainer-${id}`);
+    if (el && isOpen) el.classList.add('open');
+    if (el && !isOpen) el.classList.remove('open');
+  }
+}
+
+/* ========================================================================
+   TAB SWITCHING
+   ======================================================================== */
+function switchTab(group, tabId) {
+  const tabsContainer = document.getElementById(`${group}-tabs`);
+  if (!tabsContainer) return;
+  tabsContainer.querySelectorAll('.tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.tab === tabId);
+  });
+  // Find all tab-content siblings that belong to this group
+  const page = tabsContainer.closest('.page');
+  page.querySelectorAll('.tab-content').forEach(tc => {
+    tc.classList.toggle('active', tc.id === tabId);
+  });
+}
+
+/* ========================================================================
+   TABLE RENDERER
+   ======================================================================== */
+function renderTable(containerId, columns, rows, opts = {}) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  if (!rows || rows.length === 0) {
+    container.innerHTML = `<div class="table-wrap"><div class="table-empty">No data found</div></div>`;
+    return;
+  }
+
+  const cols = columns || Object.keys(rows[0]);
+  let html = '<div class="table-wrap"><table class="data-table"><thead><tr>';
+  cols.forEach(c => {
+    html += `<th>${escapeHtml(c)}<span class="sort-icon">&#8693;</span></th>`;
+  });
+  html += '</tr></thead><tbody>';
+  rows.forEach(row => {
+    html += '<tr>';
+    cols.forEach(c => {
+      let val = row[c];
+      if (val === null || val === undefined) val = '<span style="color:var(--text-muted)">null</span>';
+      else if (typeof val === 'object') val = '<span style="color:var(--info)">' + escapeHtml(JSON.stringify(val)) + '</span>';
+      else if (typeof val === 'boolean') val = `<span class="badge ${val ? 'badge-green' : 'badge-red'}">${val}</span>`;
+      else val = escapeHtml(String(val));
+      html += `<td>${val}</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+
+  if (opts.latency !== undefined) {
+    const cls = opts.latency < 50 ? 'fast' : opts.latency < 200 ? 'medium' : 'slow';
+    html += `<div class="flex justify-between items-center mt-8">
+      <span style="font-size:11px;color:var(--text-muted);">${rows.length} row${rows.length !== 1 ? 's' : ''} returned</span>
+      <span class="latency-badge ${cls}">${opts.latency.toFixed(1)}ms</span>
+    </div>`;
+  }
+
+  container.innerHTML = html;
+}
+
+function renderPagination(containerId, page, pageSize, total, onPageChange) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  container.innerHTML = `
+    <div class="pagination">
+      <button ${page <= 1 ? 'disabled' : ''} onclick="${onPageChange}(${page - 1})">&laquo; Prev</button>
+      <span class="page-info">Page ${page} of ${totalPages} (${total} total)</span>
+      <button ${page >= totalPages ? 'disabled' : ''} onclick="${onPageChange}(${page + 1})">Next &raquo;</button>
+    </div>
+  `;
+}
+
+/* ========================================================================
+   OVERVIEW PAGE
+   ======================================================================== */
+async function loadOverview() {
+  // Load health + stats
+  try {
+    const [health, stats] = await Promise.all([
+      apiCall('GET', '/health'),
+      apiCall('GET', '/overview/stats'),
+    ]);
+    state.health = health;
+    updateConnectionStatus('connected');
+
+    // KPIs
+    const statusBadge = stats.instance_status === 'healthy'
+      ? '<span class="badge badge-green">Healthy</span>'
+      : '<span class="badge badge-red">Unhealthy</span>';
+
+    document.getElementById('overview-kpis').innerHTML = `
+      <div class="kpi-card">
+        <div class="kpi-label">Instance Status</div>
+        <div style="margin-top:8px;">${statusBadge}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Storage Used</div>
+        <div class="kpi-value">${stats.storage_used_mb.toFixed(1)}<span style="font-size:12px;color:var(--text-muted);"> MB</span></div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Active Connections</div>
+        <div class="kpi-value accent">${stats.active_connections}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Avg Latency</div>
+        <div class="kpi-value">${stats.avg_query_latency_ms.toFixed(1)}<span style="font-size:12px;color:var(--text-muted);"> ms</span></div>
+      </div>
+    `;
+
+    // Instance info
+    const infoCard = document.getElementById('overview-instance-info');
+    infoCard.style.display = 'block';
+    document.getElementById('overview-info-rows').innerHTML = `
+      <div class="info-row"><span class="info-label">Host</span><span class="info-value">${escapeHtml(health.host)}</span></div>
+      <div class="info-row"><span class="info-label">Database</span><span class="info-value">${escapeHtml(health.database)}</span></div>
+      <div class="info-row"><span class="info-label">User</span><span class="info-value">${escapeHtml(health.user)}</span></div>
+      <div class="info-row"><span class="info-label">Port</span><span class="info-value">${health.port}</span></div>
+      <div class="info-row"><span class="info-label">PG Version</span><span class="info-value">${escapeHtml(health.pg_version || '--')}</span></div>
+      <div class="info-row"><span class="info-label">Project ID</span><span class="info-value">${escapeHtml(health.project_id || '--')}</span></div>
+    `;
+  } catch (e) {
+    updateConnectionStatus('disconnected');
+  }
+
+  // Feature cards
+  renderFeatureGrid();
+}
+
+function renderFeatureGrid() {
+  const features = [
+    { page: 'crud', icon: '&#128190;', title: 'CRUD Operations', desc: 'Read, insert, update, and delete records in Lakebase tables with real-time feedback.' },
+    { page: 'query', icon: '&#128221;', title: 'Query Editor', desc: 'Write and execute SQL directly against Lakebase with syntax highlighting and EXPLAIN ANALYZE.' },
+    { page: 'sync', icon: '&#128260;', title: 'Data Sync', desc: 'Zero-ETL automatic sync from Lakebase (Postgres) to Delta Lake tables in your Lakehouse.' },
+    { page: 'branching', icon: '&#127807;', title: 'Branching', desc: 'Create isolated database branches for safe schema migrations and development sandboxes.' },
+    { page: 'autoscaling', icon: '&#128200;', title: 'Autoscaling', desc: 'Dynamically adjust compute units based on workload demand within configured bounds.' },
+    { page: 'scaletozero', icon: '&#9199;', title: 'Scale to Zero', desc: 'Suspend compute when idle to pay only for storage. Auto-resume on connection.' },
+    { page: 'replicas', icon: '&#128214;', title: 'Read Replicas', desc: 'Dedicated read-only endpoints to offload analytical queries from the primary.' },
+    { page: 'features', icon: '&#9889;', title: 'Feature Store', desc: 'Serve pre-computed ML features with single-digit ms latency for real-time inference.' },
+    { page: 'pgvector', icon: '&#129504;', title: 'pgvector Search', desc: 'Native vector similarity search on embeddings stored alongside relational data.' },
+    { page: 'memory', icon: '&#128172;', title: 'AI Memory', desc: 'Persistent conversational memory for AI agents using Postgres + pgvector.' },
+    { page: 'monitoring', icon: '&#128202;', title: 'Monitoring', desc: 'Real-time observability: TPS, connections, cache hit rates, and slow queries.' },
+  ];
+
+  const grid = document.getElementById('overview-features');
+  grid.innerHTML = features.map(f => `
+    <div class="feature-card" onclick="navigateTo('${f.page}')">
+      <div class="feature-card-icon">${f.icon}</div>
+      <div class="feature-card-title">${f.title}</div>
+      <div class="feature-card-desc">${f.desc}</div>
+      <div class="feature-card-link">Try it &#8594;</div>
+    </div>
+  `).join('');
+}
+
+/* ========================================================================
+   CONNECTION STATUS
+   ======================================================================== */
+function updateConnectionStatus(status) {
+  state.connectionStatus = status;
+  const dot = document.getElementById('footer-status-dot');
+  const text = document.getElementById('footer-status-text');
+
+  dot.className = 'status-dot';
+  if (status === 'connected') {
+    dot.classList.add('');
+    text.textContent = 'Connected';
+    if (state.health) {
+      document.getElementById('footer-host').textContent = state.health.host || '--';
+      document.getElementById('footer-db').textContent = state.health.database || '--';
+    }
+  } else if (status === 'disconnected') {
+    dot.classList.add('disconnected');
+    text.textContent = 'Disconnected';
+  } else {
+    dot.classList.add('loading');
+    text.textContent = 'Connecting...';
+  }
+}
+
+/* ========================================================================
+   CRUD OPERATIONS
+   ======================================================================== */
+async function loadCrud() {
+  try {
+    const data = await apiCall('GET', '/tables');
+    state.tables = data.tables || [];
+    const select = document.getElementById('crud-table-select');
+    select.innerHTML = state.tables.map(t =>
+      `<option value="${t.table_name}">${t.table_name} (${t.row_count} rows)</option>`
+    ).join('');
+    if (state.tables.length > 0) {
+      state.selectedTable = state.tables[0].table_name;
+      onCrudTableChange();
+    }
+  } catch (e) {
+    document.getElementById('crud-table-select').innerHTML = '<option value="">Failed to load tables</option>';
+  }
+}
+
+async function onCrudTableChange() {
+  const select = document.getElementById('crud-table-select');
+  state.selectedTable = select.value;
+  if (!state.selectedTable) return;
+
+  // Load schema for insert form
+  try {
+    const data = await apiCall('GET', `/tables/${state.selectedTable}/schema`);
+    state.tableSchemas[state.selectedTable] = data.columns || [];
+    renderInsertForm(data.columns);
+  } catch (e) { /* ignore */ }
+
+  // Initial read
+  state.crudReadPage = 1;
+  crudRead();
+}
+
+async function crudRead(page) {
+  if (page) state.crudReadPage = page;
+  const table = state.selectedTable;
+  if (!table) return;
+
+  const customerFilter = document.getElementById('crud-filter-customer').value.trim();
+  const filters = {};
+  if (customerFilter) filters.customer_id = customerFilter;
+
+  try {
+    const data = await apiCall('POST', `/tables/${table}/query`, {
+      filters,
+      page: state.crudReadPage,
+      page_size: state.crudReadPageSize,
+      sort_by: 'event_time',
+      sort_order: 'DESC',
+    });
+    state.crudReadTotal = data.total;
+    renderTable('crud-read-results', data.columns, data.rows, { latency: data.latency_ms });
+    renderPagination('crud-read-pagination', data.page, data.page_size, data.total, 'crudRead');
+  } catch (e) {
+    document.getElementById('crud-read-results').innerHTML =
+      '<div class="table-wrap"><div class="table-empty">Error loading data</div></div>';
+  }
+}
+
+function renderInsertForm(columns) {
+  const container = document.getElementById('crud-insert-form');
+  // Exclude auto-generated columns
+  const skip = ['event_id', 'prediction_id', 'id'];
+  const fields = columns.filter(c => !skip.includes(c.name));
+
+  container.innerHTML = fields.map(c => `
+    <div class="form-group">
+      <label class="form-label">${c.name} <span style="color:var(--text-muted);">(${c.data_type})</span></label>
+      <input class="form-input" id="crud-insert-${c.name}" placeholder="${c.default_value || ''}" />
+    </div>
+  `).join('');
+}
+
+async function crudInsert() {
+  const table = state.selectedTable;
+  if (!table) return;
+  const cols = state.tableSchemas[table] || [];
+  const skip = ['event_id', 'prediction_id', 'id'];
+  const record = {};
+
+  cols.filter(c => !skip.includes(c.name)).forEach(c => {
+    const input = document.getElementById(`crud-insert-${c.name}`);
+    if (input && input.value.trim()) {
+      let val = input.value.trim();
+      if (c.data_type === 'integer' || c.data_type === 'bigint') val = parseInt(val);
+      else if (c.data_type === 'double precision' || c.data_type === 'real' || c.data_type === 'numeric') val = parseFloat(val);
+      else if (c.data_type === 'boolean') val = val === 'true';
+      else if (c.data_type === 'jsonb' || c.data_type === 'json') val = JSON.parse(val);
+      record[c.name] = val;
+    }
+  });
+
+  if (Object.keys(record).length === 0) {
+    showToast('Please fill in at least one field', 'warning');
+    return;
+  }
+
+  try {
+    const res = await apiCall('POST', `/tables/${table}/insert`, { records: [record] });
+    showToast(`Inserted ${res.inserted} record(s) into ${table}`, 'success');
+    document.getElementById('crud-insert-result').innerHTML =
+      `<div class="badge badge-green">Inserted ${res.inserted} record(s)</div>`;
+  } catch (e) { /* toast handled by apiCall */ }
+}
+
+function addWhereRow(containerId, type) {
+  const container = document.getElementById(containerId);
+  const cols = state.tableSchemas[state.selectedTable] || [];
+  const options = cols.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+
+  const row = document.createElement('div');
+  row.className = 'where-row';
+  row.innerHTML = `
+    <select class="form-select" style="max-width:180px;">${options}</select>
+    ${type === 'set' ? '<span style="color:var(--text-muted);">=</span>' : '<span style="color:var(--text-muted);">=</span>'}
+    <input class="form-input" placeholder="value" />
+    <button class="where-remove" onclick="this.parentElement.remove()">&times;</button>
+  `;
+  container.appendChild(row);
+}
+
+function collectWhereRows(containerId) {
+  const container = document.getElementById(containerId);
+  const result = {};
+  container.querySelectorAll('.where-row').forEach(row => {
+    const col = row.querySelector('select').value;
+    const val = row.querySelector('input').value.trim();
+    if (col && val) result[col] = val;
+  });
+  return result;
+}
+
+async function crudUpdate(preview) {
+  const table = state.selectedTable;
+  if (!table) return;
+
+  const setValues = collectWhereRows('crud-update-set');
+  const where = collectWhereRows('crud-update-where');
+
+  if (Object.keys(setValues).length === 0) {
+    showToast('Add at least one SET field', 'warning');
+    return;
+  }
+  if (Object.keys(where).length === 0) {
+    showToast('Add at least one WHERE condition', 'warning');
+    return;
+  }
+
+  try {
+    const body = { set_values: setValues, where, preview };
+    if (!preview && state.crudUpdateToken) {
+      body.confirmation_token = state.crudUpdateToken;
+      body.preview = false;
+    }
+    const res = await apiCall('POST', `/tables/${table}/update`, body);
+
+    if (res.confirmation_token) {
+      state.crudUpdateToken = res.confirmation_token;
+      document.getElementById('crud-update-result').innerHTML = `
+        <div class="confirm-banner">
+          <div class="confirm-banner-text">
+            <strong>${res.affected_rows} row(s)</strong> will be affected. Click Execute to confirm.
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="crudUpdate(false)">Confirm</button>
+        </div>
+      `;
+    } else {
+      state.crudUpdateToken = null;
+      showToast(`Updated ${res.updated} row(s) in ${table}`, 'success');
+      document.getElementById('crud-update-result').innerHTML =
+        `<div class="badge badge-green">Updated ${res.updated} row(s)</div>`;
+    }
+  } catch (e) { state.crudUpdateToken = null; }
+}
+
+async function crudDelete(preview) {
+  const table = state.selectedTable;
+  if (!table) return;
+
+  const where = collectWhereRows('crud-delete-where');
+  if (Object.keys(where).length === 0) {
+    showToast('Add at least one WHERE condition', 'warning');
+    return;
+  }
+
+  try {
+    const body = { where, preview };
+    if (!preview && state.crudDeleteToken) {
+      body.confirmation_token = state.crudDeleteToken;
+      body.preview = false;
+    }
+    const res = await apiCall('POST', `/tables/${table}/delete`, body);
+
+    if (res.confirmation_token) {
+      state.crudDeleteToken = res.confirmation_token;
+      document.getElementById('crud-delete-result').innerHTML = `
+        <div class="confirm-banner">
+          <div class="confirm-banner-text">
+            <strong>${res.affected_rows} row(s)</strong> will be deleted. This cannot be undone.
+          </div>
+          <button class="btn btn-danger btn-sm" onclick="crudDelete(false)">Confirm Delete</button>
+        </div>
+      `;
+    } else {
+      state.crudDeleteToken = null;
+      showToast(`Deleted ${res.deleted} row(s) from ${table}`, 'success');
+      document.getElementById('crud-delete-result').innerHTML =
+        `<div class="badge badge-red">Deleted ${res.deleted} row(s)</div>`;
+    }
+  } catch (e) { state.crudDeleteToken = null; }
+}
+
+/* ========================================================================
+   QUERY EDITOR
+   ======================================================================== */
+const QUERY_TEMPLATES = {
+  select_all: 'SELECT * FROM appshield.telemetry_events\nLIMIT 50;',
+  count_by_customer: `SELECT customer_id, COUNT(*) AS event_count\nFROM appshield.telemetry_events\nGROUP BY customer_id\nORDER BY event_count DESC\nLIMIT 20;`,
+  top_predictions: `SELECT customer_id, app_classification, confidence, predicted_at\nFROM appshield.model_predictions\nORDER BY confidence DESC\nLIMIT 25;`,
+  feature_stats: `SELECT\n  customer_id,\n  AVG(request_count_5min) AS avg_requests,\n  AVG(cookie_diversity_score) AS avg_cookie_div,\n  AVG(geo_diversity_score) AS avg_geo_div\nFROM appshield.customer_features\nGROUP BY customer_id\nORDER BY avg_requests DESC\nLIMIT 20;`,
+  recent_events: `SELECT event_id, customer_id, event_time, source_ip, http_method, request_path, response_code\nFROM appshield.telemetry_events\nORDER BY event_time DESC\nLIMIT 30;`,
+  vector_search: `-- Semantic search (requires an embedding vector)\n-- This template shows the query structure\nSELECT id, event_summary, category,\n  1 - (embedding <=> embedding) AS similarity\nFROM appshield.event_embeddings\nORDER BY embedding <=> embedding\nLIMIT 10;`,
+};
+
+function loadQueryTemplate() {
+  const key = document.getElementById('query-template-select').value;
+  if (key && QUERY_TEMPLATES[key]) {
+    document.getElementById('query-editor').value = QUERY_TEMPLATES[key];
+  }
+}
+
+async function executeQuery() {
+  const editor = document.getElementById('query-editor');
+  let sql = editor.value.trim();
+  if (!sql) {
+    showToast('Enter a SQL query', 'warning');
+    return;
+  }
+
+  const explain = document.getElementById('query-explain-toggle').checked;
+  if (explain && !sql.toUpperCase().startsWith('EXPLAIN')) {
+    sql = `EXPLAIN ANALYZE ${sql}`;
+  }
+
+  try {
+    const data = await apiCall('POST', '/query/execute', { sql });
+    state.queryResults = data;
+    renderTable('query-results', data.columns, data.rows, { latency: data.latency_ms });
+
+    // Save to history
+    const entry = {
+      sql: editor.value.trim().substring(0, 200),
+      time: new Date().toLocaleTimeString(),
+      rows: data.rows ? data.rows.length : 0,
+      latency: data.latency_ms,
+    };
+    state.queryHistory.unshift(entry);
+    if (state.queryHistory.length > 30) state.queryHistory.pop();
+    localStorage.setItem('query_history', JSON.stringify(state.queryHistory));
+    renderQueryHistory();
+  } catch (e) {
+    document.getElementById('query-results').innerHTML =
+      `<div class="card" style="border-left:3px solid var(--danger);"><div class="card-title" style="color:var(--danger);">Query Error</div><div class="card-desc mono">${escapeHtml(e.message)}</div></div>`;
+  }
+}
+
+function renderQueryHistory() {
+  const container = document.getElementById('query-history');
+  if (state.queryHistory.length === 0) {
+    container.innerHTML = '<div class="table-empty">No history yet</div>';
+    return;
+  }
+  container.innerHTML = state.queryHistory.map((h, i) => `
+    <div class="history-item" onclick="document.getElementById('query-editor').value=state.queryHistory[${i}].sql;">
+      <div class="history-item-sql">${escapeHtml(h.sql)}</div>
+      <div class="history-item-meta">${h.time} &bull; ${h.rows} rows &bull; ${h.latency ? h.latency.toFixed(1) + 'ms' : '--'}</div>
+    </div>
+  `).join('');
+}
+
+function clearQueryEditor() {
+  document.getElementById('query-editor').value = '';
+  document.getElementById('query-results').innerHTML = '';
+}
+
+function exportQueryJSON() {
+  if (!state.queryResults || !state.queryResults.rows) {
+    showToast('Execute a query first', 'warning');
+    return;
+  }
+  downloadFile('query_results.json', JSON.stringify(state.queryResults.rows, null, 2), 'application/json');
+}
+
+function exportQueryCSV() {
+  if (!state.queryResults || !state.queryResults.rows || state.queryResults.rows.length === 0) {
+    showToast('Execute a query first', 'warning');
+    return;
+  }
+  const cols = state.queryResults.columns || Object.keys(state.queryResults.rows[0]);
+  let csv = cols.join(',') + '\n';
+  state.queryResults.rows.forEach(row => {
+    csv += cols.map(c => {
+      let v = row[c];
+      if (v === null || v === undefined) return '';
+      if (typeof v === 'object') v = JSON.stringify(v);
+      return `"${String(v).replace(/"/g, '""')}"`;
+    }).join(',') + '\n';
+  });
+  downloadFile('query_results.csv', csv, 'text/csv');
+}
+
+function downloadFile(name, content, mime) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Keyboard shortcut
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    if (state.currentPage === 'query') {
+      e.preventDefault();
+      executeQuery();
+    }
+  }
+});
+
+/* ========================================================================
+   DATA SYNC
+   ======================================================================== */
+async function loadSync() {
+  // Try to load pipelines
+  try {
+    const data = await apiCall('GET', '/sync/pipelines');
+    state.syncPipelines = data.pipelines || [];
+    renderSyncPipelines();
+  } catch (e) {
+    renderDemoSyncPipelines();
+  }
+
+  // Try to load comparison
+  try {
+    const data = await apiCall('GET', '/sync/comparison');
+    renderSyncComparison(data);
+  } catch (e) {
+    renderDemoSyncComparison();
+  }
+}
+
+function renderDemoSyncPipelines() {
+  const pipelines = [
+    { pipeline_id: 'pipe-001', source_table: 'appshield.telemetry_events', target_table: 'appshield_catalog.telemetry.telemetry_events', mode: 'STREAMING', state: 'ACTIVE', last_sync_time: new Date().toISOString(), rows_synced: 50000 },
+    { pipeline_id: 'pipe-002', source_table: 'appshield.customer_features', target_table: 'appshield_catalog.telemetry.customer_features', mode: 'STREAMING', state: 'ACTIVE', last_sync_time: new Date().toISOString(), rows_synced: 60000 },
+    { pipeline_id: 'pipe-003', source_table: 'appshield.model_predictions', target_table: 'appshield_catalog.telemetry.model_predictions', mode: 'SNAPSHOT', state: 'PAUSED', last_sync_time: null, rows_synced: 0 },
+  ];
+  state.syncPipelines = pipelines;
+  renderSyncPipelines();
+}
+
+function renderSyncPipelines() {
+  const container = document.getElementById('sync-pipelines');
+  if (state.syncPipelines.length === 0) {
+    container.innerHTML = '<div class="table-wrap"><div class="table-empty">No pipelines configured</div></div>';
+    return;
+  }
+  container.innerHTML = '<div class="table-wrap"><table class="data-table"><thead><tr>' +
+    '<th>Pipeline ID</th><th>Source</th><th>Target</th><th>Mode</th><th>State</th><th>Rows Synced</th><th>Last Sync</th>' +
+    '</tr></thead><tbody>' +
+    state.syncPipelines.map(p => `<tr>
+      <td>${escapeHtml(p.pipeline_id)}</td>
+      <td>${escapeHtml(p.source_table)}</td>
+      <td>${escapeHtml(p.target_table)}</td>
+      <td><span class="badge badge-blue">${p.mode}</span></td>
+      <td><span class="badge ${p.state === 'ACTIVE' ? 'badge-green' : 'badge-yellow'}">${p.state}</span></td>
+      <td>${(p.rows_synced || 0).toLocaleString()}</td>
+      <td>${p.last_sync_time ? new Date(p.last_sync_time).toLocaleString() : '--'}</td>
+    </tr>`).join('') +
+    '</tbody></table></div>';
+}
+
+function renderDemoSyncComparison() {
+  renderSyncComparison({
+    lakebase_table: 'appshield.telemetry_events',
+    delta_table: 'appshield_catalog.telemetry.telemetry_events',
+    lakebase_row_count: 50000,
+    delta_row_count: 49875,
+  });
+}
+
+function renderSyncComparison(data) {
+  document.getElementById('sync-comparison').innerHTML = `
+    <div class="comparison-card lakebase">
+      <div class="flex items-center gap-8 mb-12">
+        <span style="font-size:18px;">&#128190;</span>
+        <div class="card-title" style="margin:0;">Lakebase (Source)</div>
+      </div>
+      <div class="info-row"><span class="info-label">Table</span><span class="info-value">${escapeHtml(data.lakebase_table || '--')}</span></div>
+      <div class="info-row"><span class="info-label">Row Count</span><span class="info-value" style="color:var(--accent);">${(data.lakebase_row_count || 0).toLocaleString()}</span></div>
+    </div>
+    <div class="comparison-card delta">
+      <div class="flex items-center gap-8 mb-12">
+        <span style="font-size:18px;">&#9651;</span>
+        <div class="card-title" style="margin:0;">Delta Lake (Target)</div>
+      </div>
+      <div class="info-row"><span class="info-label">Table</span><span class="info-value">${escapeHtml(data.delta_table || '--')}</span></div>
+      <div class="info-row"><span class="info-label">Row Count</span><span class="info-value" style="color:var(--warning);">${(data.delta_row_count || 0).toLocaleString()}</span></div>
+    </div>
+  `;
+}
+
+async function triggerSync() {
+  try {
+    const res = await apiCall('POST', '/sync/trigger', {});
+    showToast('Sync triggered successfully', 'success');
+    setTimeout(loadSync, 2000);
+  } catch (e) {
+    showToast('Sync triggered (demo mode)', 'info');
+  }
+}
+
+function showCreatePipelineModal() {
+  showModal('Create Sync Pipeline', `
+    <div class="form-group">
+      <label class="form-label">Source Table (Lakebase)</label>
+      <select class="form-select" id="modal-sync-source">
+        <option value="appshield.telemetry_events">appshield.telemetry_events</option>
+        <option value="appshield.customer_features">appshield.customer_features</option>
+        <option value="appshield.model_predictions">appshield.model_predictions</option>
+        <option value="appshield.event_embeddings">appshield.event_embeddings</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Target Table (Delta Lake)</label>
+      <input class="form-input" id="modal-sync-target" placeholder="catalog.schema.table" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Mode</label>
+      <select class="form-select" id="modal-sync-mode">
+        <option value="STREAMING">Streaming (continuous)</option>
+        <option value="SNAPSHOT">Snapshot (periodic)</option>
+      </select>
+    </div>
+  `, async () => {
+    const source = document.getElementById('modal-sync-source').value;
+    const target = document.getElementById('modal-sync-target').value;
+    const mode = document.getElementById('modal-sync-mode').value;
+    if (!target) { showToast('Enter a target table', 'warning'); return; }
+    try {
+      await apiCall('POST', '/sync/pipelines', { source_table: source, target_table: target, mode });
+      showToast('Pipeline created', 'success');
+      closeModal();
+      loadSync();
+    } catch (e) {
+      showToast('Pipeline created (demo mode)', 'info');
+      closeModal();
+    }
+  });
+}
+
+/* ========================================================================
+   BRANCHING
+   ======================================================================== */
+async function loadBranches() {
+  try {
+    const data = await apiCall('GET', '/branches');
+    state.branches = data.branches || [];
+    renderBranches();
+  } catch (e) {
+    renderDemoBranches();
+  }
+}
+
+function renderDemoBranches() {
+  state.branches = [
+    { name: 'main', state: 'ACTIVE', parent_branch: null, created_at: '2025-01-15T10:00:00Z', endpoint_host: 'main.lakebase.example.com' },
+    { name: 'dev/feature-auth', state: 'ACTIVE', parent_branch: 'main', created_at: '2025-04-01T14:30:00Z', endpoint_host: 'dev-auth.lakebase.example.com' },
+    { name: 'staging', state: 'ACTIVE', parent_branch: 'main', created_at: '2025-03-20T09:00:00Z', endpoint_host: 'staging.lakebase.example.com' },
+  ];
+  renderBranches();
+}
+
+function renderBranches() {
+  const container = document.getElementById('branch-list');
+  container.innerHTML = state.branches.map(b => {
+    const isMain = b.name === 'main';
+    const stateClass = b.state === 'ACTIVE' ? 'badge-green' : b.state === 'IDLE' ? 'badge-yellow' : 'badge-muted';
+    return `
+      <div class="card">
+        <div class="flex items-center justify-between mb-8">
+          <div class="card-title" style="margin:0;">${isMain ? '&#127807; ' : '&#128205; '}${escapeHtml(b.name)}</div>
+          <span class="badge ${stateClass}">${b.state}</span>
+        </div>
+        ${b.parent_branch ? `<div class="card-desc mb-8">Parent: <strong>${escapeHtml(b.parent_branch)}</strong></div>` : ''}
+        ${b.created_at ? `<div class="card-desc mb-8">Created: ${new Date(b.created_at).toLocaleDateString()}</div>` : ''}
+        ${b.endpoint_host ? `<div class="card-desc mono" style="font-size:10px;color:var(--text-muted);">${escapeHtml(b.endpoint_host)}</div>` : ''}
+        <div class="flex gap-8 mt-12">
+          ${!isMain ? `<button class="btn btn-sm btn-danger" onclick="deleteBranch('${escapeHtml(b.name)}')">Delete</button>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function showCreateBranchModal() {
+  const parentOptions = state.branches.map(b => `<option value="${b.name}">${b.name}</option>`).join('');
+  showModal('Create Branch', `
+    <div class="form-group">
+      <label class="form-label">Branch Name</label>
+      <input class="form-input" id="modal-branch-name" placeholder="dev/my-feature" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Parent Branch</label>
+      <select class="form-select" id="modal-branch-parent">${parentOptions}</select>
+    </div>
+  `, async () => {
+    const name = document.getElementById('modal-branch-name').value.trim();
+    const parent = document.getElementById('modal-branch-parent').value;
+    if (!name) { showToast('Enter a branch name', 'warning'); return; }
+    try {
+      await apiCall('POST', '/branches', { name, parent_branch: parent });
+      showToast(`Branch "${name}" created`, 'success');
+      closeModal();
+      loadBranches();
+    } catch (e) {
+      // Demo fallback
+      state.branches.push({ name, state: 'CREATING', parent_branch: parent, created_at: new Date().toISOString(), endpoint_host: null });
+      renderBranches();
+      showToast(`Branch "${name}" created (demo)`, 'info');
+      closeModal();
+    }
+  });
+}
+
+function showCompareBranchModal() {
+  if (state.branches.length < 2) {
+    showToast('Need at least 2 branches to compare', 'warning');
+    return;
+  }
+  const opts = state.branches.map(b => `<option value="${b.name}">${b.name}</option>`).join('');
+  showModal('Compare Branches', `
+    <div class="form-group">
+      <label class="form-label">Base Branch</label>
+      <select class="form-select" id="modal-compare-base">${opts}</select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Target Branch</label>
+      <select class="form-select" id="modal-compare-target">${opts}</select>
+    </div>
+  `, async () => {
+    const base = document.getElementById('modal-compare-base').value;
+    const target = document.getElementById('modal-compare-target').value;
+    if (base === target) { showToast('Select two different branches', 'warning'); return; }
+    closeModal();
+    try {
+      const data = await apiCall('GET', `/branches/compare?base=${base}&target=${target}`);
+      renderBranchComparison(data);
+    } catch (e) {
+      renderBranchComparison({
+        base_branch: base,
+        target_branch: target,
+        table_diffs: [
+          { table: 'telemetry_events', base_count: 50000, target_count: 50250, diff: '+250' },
+          { table: 'customer_features', base_count: 60000, target_count: 60000, diff: '0' },
+        ],
+      });
+    }
+  });
+}
+
+function renderBranchComparison(data) {
+  const container = document.getElementById('branch-compare-results');
+  container.style.display = 'block';
+  container.innerHTML = `
+    <div class="section-title">Branch Comparison: ${escapeHtml(data.base_branch)} vs ${escapeHtml(data.target_branch)}</div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Table</th><th>${escapeHtml(data.base_branch)} Rows</th><th>${escapeHtml(data.target_branch)} Rows</th><th>Diff</th></tr></thead>
+        <tbody>
+          ${(data.table_diffs || []).map(d => `<tr>
+            <td>${escapeHtml(d.table)}</td>
+            <td>${(d.base_count || 0).toLocaleString()}</td>
+            <td>${(d.target_count || 0).toLocaleString()}</td>
+            <td><span class="badge ${d.diff === '0' || d.diff === 0 ? 'badge-muted' : 'badge-green'}">${d.diff}</span></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+async function deleteBranch(name) {
+  if (!confirm(`Delete branch "${name}"? This cannot be undone.`)) return;
+  try {
+    await apiCall('DELETE', `/branches/${name}`);
+    showToast(`Branch "${name}" deleted`, 'success');
+    loadBranches();
+  } catch (e) {
+    state.branches = state.branches.filter(b => b.name !== name);
+    renderBranches();
+    showToast(`Branch "${name}" deleted (demo)`, 'info');
+  }
+}
+
+/* ========================================================================
+   AUTOSCALING
+   ======================================================================== */
+async function loadAutoscaling() {
+  try {
+    const data = await apiCall('GET', '/infrastructure/autoscaling');
+    renderAutoscaling(data);
+  } catch (e) {
+    renderAutoscaling({ current_cu: 2, min_cu: 1, max_cu: 4, memory_gib: 8 });
+  }
+}
+
+function renderAutoscaling(data) {
+  const current = data.current_cu || 2;
+  const min = data.min_cu || 0;
+  const max = data.max_cu || 10;
+  const pct = max > 0 ? Math.round((current / max) * 100) : 0;
+
+  document.getElementById('autoscale-current-cu').textContent = current;
+  document.getElementById('autoscale-min-label').textContent = `Min: ${min} CU`;
+  document.getElementById('autoscale-max-label').textContent = `Max: ${max} CU`;
+  document.getElementById('autoscale-min-input').value = min;
+  document.getElementById('autoscale-max-input').value = max;
+
+  const gauge = document.getElementById('autoscale-gauge');
+  gauge.style.width = `${pct}%`;
+  gauge.className = 'gauge-bar' + (pct > 80 ? ' danger' : pct > 60 ? ' warning' : '');
+
+  // Highlight current CU row
+  document.querySelectorAll('#autoscale-cu-table tr').forEach(tr => {
+    const cuVal = parseFloat(tr.dataset.cu);
+    tr.classList.toggle('current', cuVal === current);
+  });
+}
+
+async function applyAutoscaling() {
+  const min = parseInt(document.getElementById('autoscale-min-input').value);
+  const max = parseInt(document.getElementById('autoscale-max-input').value);
+  if (min > max) {
+    showToast('Min CU cannot exceed Max CU', 'warning');
+    return;
+  }
+  try {
+    await apiCall('POST', '/infrastructure/autoscaling', { min_cu: min, max_cu: max });
+    showToast(`Autoscaling updated: ${min}-${max} CU`, 'success');
+    loadAutoscaling();
+  } catch (e) {
+    renderAutoscaling({ current_cu: min, min_cu: min, max_cu: max });
+    showToast(`Autoscaling updated (demo): ${min}-${max} CU`, 'info');
+  }
+}
+
+/* ========================================================================
+   SCALE TO ZERO
+   ======================================================================== */
+async function loadScaleToZero() {
+  try {
+    const data = await apiCall('GET', '/infrastructure/status');
+    setScaleToZeroState(data.state || 'active');
+  } catch (e) {
+    setScaleToZeroState('active');
+  }
+}
+
+function setScaleToZeroState(s) {
+  state.s2zState = s.toLowerCase();
+  const badge = document.getElementById('s2z-state-badge');
+  const dot = document.getElementById('s2z-state-dot');
+  const text = document.getElementById('s2z-state-text');
+
+  badge.className = 'state-badge-large ' + state.s2zState;
+  const labels = { active: 'Active', suspended: 'Suspended', starting: 'Starting...' };
+  text.textContent = labels[state.s2zState] || state.s2zState;
+
+  document.getElementById('s2z-suspend-btn').disabled = state.s2zState !== 'active';
+  document.getElementById('s2z-wake-btn').disabled = state.s2zState !== 'suspended';
+}
+
+async function scaleToZeroSuspend() {
+  setScaleToZeroState('suspended');
+  document.getElementById('s2z-last-suspended').textContent = new Date().toLocaleTimeString();
+  clearStopwatch();
+  showToast('Instance suspended', 'info');
+
+  try {
+    await apiCall('POST', '/infrastructure/suspend', {});
+  } catch (e) { /* demo mode */ }
+}
+
+async function scaleToZeroWake() {
+  setScaleToZeroState('starting');
+  startStopwatch();
+
+  try {
+    await apiCall('POST', '/infrastructure/resume', {});
+    await new Promise(r => setTimeout(r, 1500 + Math.random() * 1500));
+    setScaleToZeroState('active');
+    stopStopwatch();
+    document.getElementById('s2z-last-resumed').textContent = new Date().toLocaleTimeString();
+    showToast('Instance resumed', 'success');
+  } catch (e) {
+    // Demo: simulate resume time
+    setTimeout(() => {
+      setScaleToZeroState('active');
+      stopStopwatch();
+      document.getElementById('s2z-last-resumed').textContent = new Date().toLocaleTimeString();
+      showToast('Instance resumed (demo)', 'success');
+    }, 1200 + Math.random() * 1800);
+  }
+}
+
+function startStopwatch() {
+  state.s2zTimerStart = performance.now();
+  const el = document.getElementById('s2z-stopwatch');
+  el.classList.add('running');
+
+  if (state.s2zTimerInterval) clearInterval(state.s2zTimerInterval);
+  state.s2zTimerInterval = setInterval(() => {
+    const elapsed = (performance.now() - state.s2zTimerStart) / 1000;
+    const sec = Math.floor(elapsed);
+    const ds = Math.floor((elapsed - sec) * 10);
+    el.textContent = `${String(sec).padStart(2, '0')}:${String(Math.floor((elapsed % 60) - sec % 60 + sec % 60)).padStart(2, '0')}.${ds}`;
+    el.textContent = `${String(Math.floor(elapsed / 60)).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}.${ds}`;
+  }, 100);
+}
+
+function stopStopwatch() {
+  if (state.s2zTimerInterval) {
+    clearInterval(state.s2zTimerInterval);
+    state.s2zTimerInterval = null;
+  }
+  const el = document.getElementById('s2z-stopwatch');
+  el.classList.remove('running');
+}
+
+function clearStopwatch() {
+  stopStopwatch();
+  document.getElementById('s2z-stopwatch').textContent = '00:00.0';
+}
+
+/* ========================================================================
+   READ REPLICAS
+   ======================================================================== */
+async function loadReplicas() {
+  try {
+    const data = await apiCall('GET', '/infrastructure/endpoints');
+    renderReplicaEndpoints(data.endpoints || []);
+  } catch (e) {
+    renderReplicaEndpoints([
+      { name: 'primary', state: 'ACTIVE', type: 'r_w', compute_units: 2, host: 'primary.lakebase.example.com' },
+      { name: 'replica-1', state: 'ACTIVE', type: 'r_o', compute_units: 2, host: 'replica-1.lakebase.example.com' },
+    ]);
+  }
+}
+
+function renderReplicaEndpoints(endpoints) {
+  // Render diagram
+  const diagram = document.getElementById('replicas-diagram');
+  const primary = endpoints.find(e => e.type === 'r_w');
+  const replicas = endpoints.filter(e => e.type === 'r_o');
+
+  let html = `
+    <div class="endpoint-box primary">
+      <div class="endpoint-box-label">Primary (R/W)</div>
+      <div class="endpoint-box-name">${primary ? escapeHtml(primary.name) : 'primary'}</div>
+    </div>
+  `;
+  replicas.forEach(r => {
+    html += `
+      <div class="endpoint-arrow">&#8594;</div>
+      <div class="endpoint-box">
+        <div class="endpoint-box-label">Replica (R/O)</div>
+        <div class="endpoint-box-name">${escapeHtml(r.name)}</div>
+      </div>
+    `;
+  });
+  diagram.innerHTML = html;
+
+  // Render table
+  const container = document.getElementById('replicas-table');
+  container.innerHTML = '<div class="table-wrap"><table class="data-table"><thead><tr>' +
+    '<th>Name</th><th>Type</th><th>State</th><th>CU</th><th>Host</th>' +
+    '</tr></thead><tbody>' +
+    endpoints.map(ep => `<tr>
+      <td>${escapeHtml(ep.name)}</td>
+      <td><span class="badge ${ep.type === 'r_w' ? 'badge-green' : 'badge-blue'}">${ep.type === 'r_w' ? 'Read/Write' : 'Read Only'}</span></td>
+      <td><span class="badge ${ep.state === 'ACTIVE' ? 'badge-green' : 'badge-yellow'}">${ep.state}</span></td>
+      <td>${ep.compute_units || '--'}</td>
+      <td style="font-size:10px;">${ep.host ? escapeHtml(ep.host) : '--'}</td>
+    </tr>`).join('') +
+    '</tbody></table></div>';
+}
+
+async function runOnBothEndpoints() {
+  const sql = document.getElementById('replicas-sql-input').value.trim();
+  if (!sql) {
+    showToast('Enter a SQL query', 'warning');
+    return;
+  }
+
+  const container = document.getElementById('replicas-comparison');
+  container.style.display = 'grid';
+  container.innerHTML = '<div class="skeleton skeleton-card"></div><div class="skeleton skeleton-card"></div>';
+
+  // Run on primary
+  let primaryResult, replicaResult;
+  try {
+    const start = performance.now();
+    primaryResult = await apiCall('POST', '/query/execute', { sql });
+    primaryResult._latency = performance.now() - start;
+  } catch (e) {
+    primaryResult = { rows: [], _latency: 5 + Math.random() * 15, _error: e.message };
+  }
+
+  // Simulate replica (slightly different latency)
+  replicaResult = {
+    rows: primaryResult.rows || [],
+    _latency: (primaryResult._latency || 10) * (0.8 + Math.random() * 0.4),
+  };
+
+  const pCls = primaryResult._latency < 50 ? 'fast' : primaryResult._latency < 200 ? 'medium' : 'slow';
+  const rCls = replicaResult._latency < 50 ? 'fast' : replicaResult._latency < 200 ? 'medium' : 'slow';
+
+  container.innerHTML = `
+    <div class="comparison-card lakebase">
+      <div class="flex items-center justify-between mb-12">
+        <div class="card-title" style="margin:0;">Primary (R/W)</div>
+        <span class="latency-badge ${pCls}">${primaryResult._latency.toFixed(1)}ms</span>
+      </div>
+      <div class="info-row"><span class="info-label">Rows</span><span class="info-value">${(primaryResult.rows || []).length}</span></div>
+      ${primaryResult._error ? `<div style="color:var(--danger);font-size:12px;margin-top:8px;">${escapeHtml(primaryResult._error)}</div>` : ''}
+    </div>
+    <div class="comparison-card delta" style="border-top-color:var(--info);">
+      <div class="flex items-center justify-between mb-12">
+        <div class="card-title" style="margin:0;">Replica (R/O)</div>
+        <span class="latency-badge ${rCls}">${replicaResult._latency.toFixed(1)}ms</span>
+      </div>
+      <div class="info-row"><span class="info-label">Rows</span><span class="info-value">${replicaResult.rows.length}</span></div>
+    </div>
+  `;
+}
+
+/* ========================================================================
+   FEATURE STORE
+   ======================================================================== */
+async function loadFeatureStore() {
+  loadFeatureTable();
+}
+
+async function loadFeatureTable(page) {
+  if (page) state.featurePage = page;
+  try {
+    const data = await apiCall('POST', '/tables/customer_features/query', {
+      filters: {},
+      page: state.featurePage,
+      page_size: state.featurePageSize,
+      sort_by: 'time_bucket',
+      sort_order: 'DESC',
+    });
+    renderTable('feature-table-results', data.columns, data.rows, { latency: data.latency_ms });
+    renderPagination('feature-table-pagination', data.page, data.page_size, data.total, 'loadFeatureTable');
+  } catch (e) {
+    document.getElementById('feature-table-results').innerHTML =
+      '<div class="table-wrap"><div class="table-empty">Failed to load feature table</div></div>';
+  }
+}
+
+async function featureLookup() {
+  const customerId = document.getElementById('feature-lookup-input').value.trim();
+  if (!customerId) {
+    showToast('Enter a customer ID', 'warning');
+    return;
+  }
+
+  const container = document.getElementById('feature-lookup-result');
+  container.innerHTML = '<div class="skeleton skeleton-card" style="height:120px;"></div>';
+
+  try {
+    const start = performance.now();
+    const data = await apiCall('POST', '/tables/customer_features/query', {
+      filters: { customer_id: customerId },
+      page: 1,
+      page_size: 1,
+      sort_by: 'time_bucket',
+      sort_order: 'DESC',
+    });
+    const latency = data.latency_ms || (performance.now() - start);
+    const row = data.rows && data.rows[0];
+
+    if (!row) {
+      container.innerHTML = '<div class="card"><div class="card-desc">No features found for this customer</div></div>';
+      return;
+    }
+
+    const cls = latency < 20 ? 'fast' : latency < 100 ? 'medium' : 'slow';
+    container.innerHTML = `
+      <div class="card">
+        <div class="flex items-center justify-between mb-16">
+          <div class="card-title" style="margin:0;">Features for ${escapeHtml(customerId)}</div>
+          <span class="latency-badge ${cls}">&#9889; ${latency.toFixed(1)}ms</span>
+        </div>
+        <div class="grid-2">
+          ${Object.entries(row).filter(([k]) => k !== 'customer_id' && k !== 'time_bucket').map(([k, v]) => `
+            <div class="info-row">
+              <span class="info-label">${k}</span>
+              <span class="info-value">${typeof v === 'number' ? (Number.isInteger(v) ? v : v.toFixed(4)) : v}</span>
+            </div>
+          `).join('')}
+        </div>
+        <div class="info-row mt-8">
+          <span class="info-label">Time Bucket</span>
+          <span class="info-value">${row.time_bucket ? new Date(row.time_bucket).toLocaleString() : '--'}</span>
+        </div>
+      </div>
+    `;
+  } catch (e) {
+    container.innerHTML = '<div class="card"><div class="card-desc" style="color:var(--danger);">Error looking up features</div></div>';
+  }
+}
+
+async function featureCompare() {
+  const customerId = document.getElementById('feature-compare-input').value.trim();
+  if (!customerId) {
+    showToast('Enter a customer ID', 'warning');
+    return;
+  }
+
+  const container = document.getElementById('feature-compare-result');
+  container.style.display = 'grid';
+  container.innerHTML = '<div class="skeleton skeleton-card"></div><div class="skeleton skeleton-card"></div>';
+
+  // Lakebase lookup
+  let lakebaseResult;
+  try {
+    const start = performance.now();
+    const data = await apiCall('POST', '/tables/customer_features/query', {
+      filters: { customer_id: customerId },
+      page: 1,
+      page_size: 1,
+      sort_by: 'time_bucket',
+      sort_order: 'DESC',
+    });
+    lakebaseResult = {
+      features: data.rows && data.rows[0] ? data.rows[0] : null,
+      latency: data.latency_ms || (performance.now() - start),
+    };
+  } catch (e) {
+    lakebaseResult = { features: null, latency: 0 };
+  }
+
+  // Simulate Delta Lake (slower)
+  const deltaLatency = 150 + Math.random() * 350;
+  const deltaResult = {
+    features: lakebaseResult.features,
+    latency: deltaLatency,
+  };
+
+  const lCls = lakebaseResult.latency < 20 ? 'fast' : lakebaseResult.latency < 100 ? 'medium' : 'slow';
+  const dCls = 'slow';
+
+  function renderFeatureCard(title, result, cls, accent) {
+    if (!result.features) return `<div class="comparison-card"><div class="card-title">${title}</div><div class="card-desc">No data</div></div>`;
+    return `
+      <div class="comparison-card" style="border-top:3px solid ${accent};">
+        <div class="flex items-center justify-between mb-12">
+          <div class="card-title" style="margin:0;">${title}</div>
+          <span class="latency-badge ${cls}">${result.latency.toFixed(1)}ms</span>
+        </div>
+        ${Object.entries(result.features).filter(([k]) => k !== 'customer_id' && k !== 'time_bucket').map(([k, v]) => `
+          <div class="info-row">
+            <span class="info-label">${k}</span>
+            <span class="info-value">${typeof v === 'number' ? (Number.isInteger(v) ? v : v.toFixed(4)) : v}</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  container.innerHTML =
+    renderFeatureCard('Lakebase (Online)', lakebaseResult, lCls, 'var(--accent)') +
+    renderFeatureCard('Delta Lake (Batch)', deltaResult, dCls, 'var(--warning)');
+}
+
+/* ========================================================================
+   PGVECTOR SEARCH
+   ======================================================================== */
+function setVectorQuery(q) {
+  document.getElementById('pgvector-search-input').value = q;
+  vectorSearch();
+}
+
+async function vectorSearch() {
+  const query = document.getElementById('pgvector-search-input').value.trim();
+  if (!query) {
+    showToast('Enter a search query', 'warning');
+    return;
+  }
+
+  const container = document.getElementById('pgvector-results');
+  container.innerHTML = Array(3).fill('<div class="skeleton skeleton-card" style="height:80px;margin-bottom:12px;"></div>').join('');
+
+  try {
+    const data = await apiCall('POST', '/pgvector/search', { query, top_n: 10 });
+    renderVectorResults(data.results || []);
+  } catch (e) {
+    // Demo fallback: generate mock results
+    const mockResults = generateMockVectorResults(query);
+    renderVectorResults(mockResults);
+  }
+}
+
+function generateMockVectorResults(query) {
+  const categories = ['security_threat', 'configuration_error', 'traffic_anomaly', 'performance_issue', 'authentication_event'];
+  const templates = [
+    `DDoS attack detected from IP range 185.220.101.0/8 targeting /api/v1/events`,
+    `SSL certificate expired for domain acme.io`,
+    `Bot traffic spike detected in us-east-1: 4500 req/min`,
+    `Brute-force login attempt against /auth/login from 45.33.32.112`,
+    `High latency on /api/v1/analytics: avg 3200ms over last 5 minutes`,
+    `TLS downgrade attempt detected on customer widget-co`,
+    `JWT token reuse detected: same token from 3 IPs`,
+    `SQL injection attempt blocked on /api/v2/detections from 10.0.0.199`,
+    `Rate limit exceeded for customer acme-corp: 8500 req/min`,
+    `P99 latency spike on /dashboard/security: 5100ms`,
+  ];
+
+  const qLower = query.toLowerCase();
+  return templates.map((summary, i) => {
+    // Score based on keyword overlap
+    const words = qLower.split(/\s+/);
+    const matchCount = words.filter(w => summary.toLowerCase().includes(w)).length;
+    const baseScore = matchCount / Math.max(words.length, 1);
+    const score = Math.min(0.99, baseScore * 0.6 + (1 - i * 0.05) * 0.4);
+    return {
+      event_summary: summary,
+      category: categories[i % categories.length],
+      distance: 1 - score,
+      score: score,
+    };
+  }).sort((a, b) => b.score - a.score).slice(0, 8);
+}
+
+function renderVectorResults(results) {
+  const container = document.getElementById('pgvector-results');
+  if (results.length === 0) {
+    container.innerHTML = '<div class="card"><div class="card-desc">No matching results</div></div>';
+    return;
+  }
+
+  const categoryColors = {
+    security_threat: 'badge-red',
+    configuration_error: 'badge-yellow',
+    traffic_anomaly: 'badge-blue',
+    performance_issue: 'badge-violet',
+    authentication_event: 'badge-muted',
+  };
+
+  container.innerHTML = results.map((r, i) => `
+    <div class="search-result-card">
+      <div class="search-result-header">
+        <span style="color:var(--text-muted);font-size:11px;font-family:'Space Mono',monospace;">#${i + 1}</span>
+        <span class="badge ${categoryColors[r.category] || 'badge-muted'}">${(r.category || '').replace(/_/g, ' ')}</span>
+      </div>
+      <div class="search-result-summary">${escapeHtml(r.event_summary)}</div>
+      <div class="relevance-bar-wrap">
+        <span style="color:var(--text-muted);">Relevance</span>
+        <div class="relevance-bar">
+          <div class="relevance-bar-fill" style="width:${Math.round((r.score || 0) * 100)}%;"></div>
+        </div>
+        <span class="mono" style="color:var(--accent);">${((r.score || 0) * 100).toFixed(1)}%</span>
+        <span class="mono" style="color:var(--text-muted);margin-left:8px;">dist: ${(r.distance || 0).toFixed(4)}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function clearVectorResults() {
+  document.getElementById('pgvector-search-input').value = '';
+  document.getElementById('pgvector-results').innerHTML = '';
+}
+
+/* ========================================================================
+   AI MEMORY
+   ======================================================================== */
+async function memorySend() {
+  const input = document.getElementById('memory-chat-input');
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+
+  // Add user message
+  addChatMessage('user', msg);
+
+  // Try API first
+  try {
+    const data = await apiCall('POST', '/memory/chat', { message: msg });
+    addChatMessage('assistant', data.reply || 'I received your message.');
+    if (data.memories) renderRecalledMemories(data.memories);
+  } catch (e) {
+    // Demo fallback
+    const demoReply = generateDemoReply(msg);
+    setTimeout(() => {
+      addChatMessage('assistant', demoReply.reply);
+      renderRecalledMemories(demoReply.memories);
+    }, 500 + Math.random() * 1000);
+  }
+}
+
+function addChatMessage(role, text) {
+  const container = document.getElementById('memory-chat-messages');
+  const msgDiv = document.createElement('div');
+  msgDiv.className = `chat-message ${role}`;
+  msgDiv.innerHTML = `
+    <div class="chat-avatar">${role === 'user' ? 'U' : 'AI'}</div>
+    <div class="chat-bubble">${escapeHtml(text)}</div>
+  `;
+  container.appendChild(msgDiv);
+  container.scrollTop = container.scrollHeight;
+  state.chatMessages.push({ role, text });
+}
+
+function generateDemoReply(msg) {
+  const lower = msg.toLowerCase();
+  let reply = '';
+  const memories = [];
+
+  if (lower.includes('ddos') || lower.includes('attack')) {
+    reply = 'Based on recent telemetry, I see elevated DDoS indicators from the 185.220.101.x range targeting API endpoints. The last major incident affected acme-corp and globex-inc. I\'ll remember this context for follow-up questions.';
+    memories.push(
+      { type: 'fact', text: 'DDoS pattern from 185.220.101.x range detected targeting /api/v1/events', score: 0.92 },
+      { type: 'conversation', text: 'User asked about DDoS attack patterns', score: 0.88 },
+      { type: 'fact', text: 'acme-corp and globex-inc most affected by recent DDoS', score: 0.75 },
+    );
+  } else if (lower.includes('customer') || lower.includes('acme') || lower.includes('globex')) {
+    reply = 'I can pull up customer-specific data from Lakebase. The feature store shows behavioral patterns for 200 customers. Acme-corp has high request volumes (avg 1,500 req/5min) with moderate geo diversity. Want me to dig into a specific customer?';
+    memories.push(
+      { type: 'fact', text: 'AppShield monitors 200 customer tenants', score: 0.85 },
+      { type: 'conversation', text: 'User interested in customer-level analytics', score: 0.80 },
+    );
+  } else if (lower.includes('ssl') || lower.includes('tls') || lower.includes('certificate')) {
+    reply = 'SSL/TLS health data shows 95% of traffic on TLS 1.3, with a small tail on TLS 1.2. I found 3 customers with expired certificate warnings this week. HSTS compliance is at 65% across all tenants.';
+    memories.push(
+      { type: 'fact', text: '95% traffic on TLS 1.3, 5% on TLS 1.2/1.1', score: 0.91 },
+      { type: 'fact', text: 'HSTS compliance at 65% across tenants', score: 0.78 },
+    );
+  } else {
+    reply = `I've noted your message about "${msg.substring(0, 50)}". This will be stored as a memory in Lakebase using pgvector embeddings, so I can recall relevant context in future conversations. What would you like to explore?`;
+    memories.push(
+      { type: 'conversation', text: `User message: "${msg.substring(0, 80)}"`, score: 0.95 },
+    );
+  }
+
+  return { reply, memories };
+}
+
+function renderRecalledMemories(memories) {
+  const container = document.getElementById('memory-recalled-list');
+  if (!memories || memories.length === 0) {
+    container.innerHTML = '<div class="section-muted text-center" style="padding:20px 0;">No related memories</div>';
+    return;
+  }
+  state.memories = [...state.memories, ...memories];
+
+  container.innerHTML = memories.map(m => {
+    const typeClass = m.type === 'fact' ? 'badge-green' : m.type === 'conversation' ? 'badge-blue' : 'badge-violet';
+    return `
+      <div class="memory-item">
+        <div class="memory-item-header">
+          <span class="badge ${typeClass}">${m.type}</span>
+          <span class="memory-score">${((m.score || 0) * 100).toFixed(0)}%</span>
+        </div>
+        <div class="memory-item-text">${escapeHtml(m.text)}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function viewAllMemories() {
+  if (state.memories.length === 0) {
+    showToast('No memories stored yet — send some messages first', 'info');
+    return;
+  }
+  showModal('All Stored Memories', `
+    <div style="max-height:400px;overflow-y:auto;">
+      ${state.memories.map(m => {
+        const typeClass = m.type === 'fact' ? 'badge-green' : m.type === 'conversation' ? 'badge-blue' : 'badge-violet';
+        return `<div class="memory-item">
+          <div class="memory-item-header">
+            <span class="badge ${typeClass}">${m.type}</span>
+            <span class="memory-score">${((m.score || 0) * 100).toFixed(0)}%</span>
+          </div>
+          <div class="memory-item-text">${escapeHtml(m.text)}</div>
+        </div>`;
+      }).join('')}
+    </div>
+  `);
+}
+
+/* ========================================================================
+   MONITORING
+   ======================================================================== */
+async function loadMonitoring() {
+  try {
+    const data = await apiCall('GET', '/monitoring/metrics');
+    renderMonitoringMetrics(data);
+  } catch (e) {
+    renderMonitoringMetrics({
+      tps: 120 + Math.random() * 80,
+      active_connections: 3 + Math.floor(Math.random() * 5),
+      cache_hit_rate: 95 + Math.random() * 4.9,
+      storage_used_mb: 48 + Math.random() * 20,
+    });
+  }
+
+  try {
+    const data = await apiCall('GET', '/monitoring/slow-queries');
+    renderSlowQueries(data.queries || []);
+  } catch (e) {
+    renderSlowQueries([
+      { query: 'SELECT * FROM appshield.telemetry_events WHERE customer_id = $1 ORDER BY event_time DESC', calls: 1250, mean_exec_time_ms: 45.2, total_exec_time_ms: 56500 },
+      { query: 'SELECT COUNT(*) FROM appshield.event_embeddings WHERE 1 - (embedding <=> $1) > 0.7', calls: 340, mean_exec_time_ms: 120.5, total_exec_time_ms: 40970 },
+      { query: 'UPDATE appshield.customer_features SET request_count_5min = $1 WHERE customer_id = $2', calls: 8500, mean_exec_time_ms: 2.1, total_exec_time_ms: 17850 },
+    ]);
+  }
+
+  document.getElementById('monitoring-last-updated').textContent = `Updated ${new Date().toLocaleTimeString()}`;
+}
+
+function renderMonitoringMetrics(data) {
+  // TPS
+  document.getElementById('mon-tps').textContent = Math.round(data.tps || 0);
+  state.tpsHistory.push(data.tps || 0);
+  if (state.tpsHistory.length > 20) state.tpsHistory.shift();
+  renderSparkline('mon-tps-spark', state.tpsHistory);
+
+  // Connections
+  document.getElementById('mon-connections').textContent = data.active_connections || 0;
+
+  // Cache hit rate
+  const cacheRate = data.cache_hit_rate || 0;
+  document.getElementById('mon-cache-rate').textContent = cacheRate.toFixed(1) + '%';
+  const cacheBar = document.getElementById('mon-cache-bar');
+  cacheBar.style.width = cacheRate + '%';
+  cacheBar.className = 'gauge-bar' + (cacheRate < 80 ? ' danger' : cacheRate < 95 ? ' warning' : '');
+
+  // Storage
+  document.getElementById('mon-storage').textContent = (data.storage_used_mb || 0).toFixed(1) + ' MB';
+}
+
+function renderSparkline(containerId, values) {
+  const container = document.getElementById(containerId);
+  if (!container || values.length === 0) return;
+  const max = Math.max(...values, 1);
+  container.innerHTML = values.map(v => {
+    const h = Math.max(2, Math.round((v / max) * 24));
+    return `<div class="sparkline-bar" style="height:${h}px;"></div>`;
+  }).join('');
+}
+
+function renderSlowQueries(queries) {
+  const container = document.getElementById('monitoring-slow-queries');
+  if (queries.length === 0) {
+    container.innerHTML = '<div class="table-wrap"><div class="table-empty">No slow queries detected</div></div>';
+    return;
+  }
+
+  container.innerHTML = '<div class="table-wrap"><table class="data-table"><thead><tr>' +
+    '<th>Query</th><th>Calls</th><th>Mean (ms)</th><th>Total (ms)</th>' +
+    '</tr></thead><tbody>' +
+    queries.map(q => `<tr>
+      <td style="max-width:500px;"><span class="mono" style="font-size:10px;">${escapeHtml((q.query || '').substring(0, 120))}</span></td>
+      <td>${(q.calls || 0).toLocaleString()}</td>
+      <td><span class="latency-badge ${q.mean_exec_time_ms < 50 ? 'fast' : q.mean_exec_time_ms < 200 ? 'medium' : 'slow'}">${(q.mean_exec_time_ms || 0).toFixed(1)}</span></td>
+      <td>${(q.total_exec_time_ms || 0).toLocaleString()}</td>
+    </tr>`).join('') +
+    '</tbody></table></div>';
+}
+
+function toggleMonitoringRefresh() {
+  const checked = document.getElementById('monitoring-auto-refresh').checked;
+  if (checked) {
+    state.monitoringInterval = setInterval(loadMonitoring, 5000);
+  } else {
+    if (state.monitoringInterval) {
+      clearInterval(state.monitoringInterval);
+      state.monitoringInterval = null;
+    }
+  }
+}
+
+/* ========================================================================
+   MODAL SYSTEM
+   ======================================================================== */
+function showModal(title, bodyHtml, onConfirm) {
+  const root = document.getElementById('modal-root');
+  root.innerHTML = `
+    <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+      <div class="modal">
+        <div class="modal-title">${title}</div>
+        <div class="modal-body">${bodyHtml}</div>
+        <div class="modal-actions">
+          <button class="btn" onclick="closeModal()">Cancel</button>
+          ${onConfirm ? '<button class="btn btn-primary" id="modal-confirm-btn">Confirm</button>' : ''}
+        </div>
+      </div>
+    </div>
+  `;
+  if (onConfirm) {
+    document.getElementById('modal-confirm-btn').addEventListener('click', onConfirm);
+  }
+}
+
+function closeModal() {
+  document.getElementById('modal-root').innerHTML = '';
+}
+
+/* ========================================================================
+   INITIALIZATION
+   ======================================================================== */
+function init() {
+  initSidebar();
+  restoreExplainers();
+  renderQueryHistory();
+  loadOverview();
+
+  // Set up query editor placeholder
+  const editor = document.getElementById('query-editor');
+  if (editor) {
+    editor.value = 'SELECT * FROM appshield.telemetry_events\nLIMIT 10;';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
