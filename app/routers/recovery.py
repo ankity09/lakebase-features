@@ -175,30 +175,28 @@ def restore_from_snapshot(body: RestoreRequest):
         else:
             raise Exception(f"Branch {branch_name} did not become READY within 30 seconds")
 
-        # 3. Create an endpoint on the branch
-        ep_name = "restore-ep"
-        logger.info("Creating endpoint %s on branch %s", ep_name, branch_name)
-        _api("POST", f"projects/{PROJECT}/branches/{branch_name}/endpoints?endpoint_id={ep_name}", body={
-            "spec": {
-                "endpoint_type": "ENDPOINT_TYPE_READ_WRITE",
-                "autoscaling_limit_min_cu": 0.5,
-                "autoscaling_limit_max_cu": 2,
-            }
-        })
-
-        # 4. Wait for endpoint to be ACTIVE
-        logger.info("Waiting for endpoint %s to be ACTIVE...", ep_name)
+        # 3. Find the auto-created endpoint on the branch (branches come with a default endpoint)
+        logger.info("Looking for endpoint on branch %s", branch_name)
         restore_host = None
         for _ in range(20):  # max 60 seconds
             time.sleep(3)
-            ep = _api("GET", f"projects/{PROJECT}/branches/{branch_name}/endpoints/{ep_name}")
-            ep_state = ep.get("status", {}).get("current_state", "")
-            logger.info("Endpoint %s state: %s", ep_name, ep_state)
-            if ep_state in ("ACTIVE", "IDLE"):
-                restore_host = ep.get("status", {}).get("hosts", {}).get("host", "")
-                break
+            try:
+                eps_resp = _api("GET", f"projects/{PROJECT}/branches/{branch_name}/endpoints")
+                endpoints = eps_resp.get("endpoints", [])
+                for ep in endpoints:
+                    ep_state = ep.get("status", {}).get("current_state", "")
+                    host = ep.get("status", {}).get("hosts", {}).get("host", "")
+                    ep_name = ep.get("name", "").split("/")[-1]
+                    logger.info("Endpoint %s state: %s host: %s", ep_name, ep_state, host[:30] if host else "none")
+                    if ep_state in ("ACTIVE", "IDLE") and host:
+                        restore_host = host
+                        break
+                if restore_host:
+                    break
+            except Exception as poll_err:
+                logger.warning("Polling endpoints: %s", poll_err)
         else:
-            raise Exception(f"Endpoint {ep_name} did not become ACTIVE within 60 seconds")
+            raise Exception(f"No active endpoint found on branch {branch_name} within 60 seconds")
 
         if not restore_host:
             raise Exception("Endpoint became active but no host found")

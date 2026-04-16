@@ -3750,7 +3750,7 @@ async function recoveryRestore() {
     updateRecoveryActionArea();
   } catch (e) {
     showToast('Restore failed: ' + (e.response?.data?.detail || e.message), 'error');
-    if (btn) { btn.disabled = false; btn.textContent = '&#9200; Restore to Snapshot'; }
+    if (btn) { btn.disabled = false; btn.innerHTML = '&#9200; Restore to Snapshot'; }
   }
 }
 
