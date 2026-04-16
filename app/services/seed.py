@@ -486,3 +486,54 @@ def seed_if_needed() -> None:
                 logger.info("Skipped event_embeddings (pgvector unavailable).")
 
             logger.info("AppShield seed complete.")
+
+    # Create demo branches for the Branching page
+    try:
+        from app.services.lakebase_api import get_workspace_client
+        w = get_workspace_client()
+        PROJECT = "lakebase-features"
+
+        # Check existing branches
+        existing = w.api_client.do("GET", f"/api/2.0/postgres/projects/{PROJECT}/branches")
+        existing_names = [b.get("status", {}).get("branch_id", "") for b in existing.get("branches", [])]
+
+        for branch_name in ["dev", "staging"]:
+            if branch_name not in existing_names:
+                logger.info(f"Creating demo branch: {branch_name}")
+                try:
+                    w.api_client.do("POST", f"/api/2.0/postgres/projects/{PROJECT}/branches/{branch_name}", body={
+                        "spec": {
+                            "source_branch": f"projects/{PROJECT}/branches/production",
+                            "no_expiry": True,
+                        }
+                    })
+                    logger.info(f"Branch '{branch_name}' created successfully")
+                except Exception as be:
+                    logger.warning(f"Failed to create branch '{branch_name}': {be}")
+            else:
+                logger.info(f"Branch '{branch_name}' already exists")
+    except Exception as e:
+        logger.warning(f"Branch creation skipped: {e}")
+
+    # Create a read-only endpoint for the Read Replicas demo
+    try:
+        endpoints = w.api_client.do("GET", f"/api/2.0/postgres/projects/{PROJECT}/branches/production/endpoints")
+        endpoint_names = [e.get("name", "").split("/")[-1] for e in endpoints.get("endpoints", [])]
+
+        if "read-replica" not in endpoint_names:
+            logger.info("Creating read-only endpoint: read-replica")
+            try:
+                w.api_client.do("POST", f"/api/2.0/postgres/projects/{PROJECT}/branches/production/endpoints/read-replica", body={
+                    "spec": {
+                        "endpoint_type": "ENDPOINT_TYPE_READ_ONLY",
+                        "autoscaling_limit_min_cu": 0.5,
+                        "autoscaling_limit_max_cu": 2.0,
+                    }
+                })
+                logger.info("Read replica endpoint created")
+            except Exception as re:
+                logger.warning(f"Failed to create read replica: {re}")
+        else:
+            logger.info("Read replica endpoint already exists")
+    except Exception as e:
+        logger.warning(f"Read replica creation skipped: {e}")

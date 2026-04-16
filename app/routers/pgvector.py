@@ -127,9 +127,9 @@ def vector_stats():
 
         # Extension version
         _, ext_rows, _ = execute_query(
-            "SELECT extversion FROM pg_available_extensions WHERE name = 'vector'"
+            "SELECT installed_version FROM pg_extension WHERE extname = 'vector'"
         )
-        pgvector_version = ext_rows[0]["extversion"] if ext_rows else None
+        pgvector_version = ext_rows[0]["installed_version"] if ext_rows else None
 
         if pgvector_version is None:
             return {

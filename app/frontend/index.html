@@ -1758,6 +1758,7 @@ code, pre, .mono { font-family: 'Space Mono', monospace; }
       <span class="chevron">&#9654;</span> What is this?
     </button>
     <div class="explainer-body">
+      <strong>Architecture Reference</strong> — This page shows how Lakebase Data Sync works. In production, you configure sync pipelines that automatically replicate data between Delta Lake tables and Lakebase. The pipeline data below is illustrative.<br><br>
       <strong>Zero-ETL Data Sync</strong> automatically replicates Lakebase (Postgres) tables to Delta Lake in your Lakehouse.
       No pipelines to build or maintain — data flows continuously so analytics teams can query fresh operational data
       using Spark, SQL Warehouses, or AI/BI dashboards. Changes in Lakebase appear in Delta within seconds.
@@ -1925,6 +1926,11 @@ code, pre, .mono { font-family: 'Space Mono', monospace; }
       When a new connection arrives, Lakebase automatically wakes up (typically in 1-3 seconds).
       This is ideal for dev/staging environments, periodic batch workloads, or cost-sensitive applications.
     </div>
+  </div>
+
+  <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid #F59E0B; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+    <strong style="color: #F59E0B;">&#9888; Warning:</strong>
+    <span style="color: #A0A0A8;"> Suspending will temporarily disconnect this app from Lakebase. The app will show errors until the endpoint resumes (~5-30 seconds). Only demo this when you're prepared for a brief interruption.</span>
   </div>
 
   <div class="flex gap-24 items-center mb-24">
