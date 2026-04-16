@@ -22,15 +22,21 @@ def get_pool() -> pool.ThreadedConnectionPool | None:
         _pool_failed = True
         return None
     try:
+        conn_params = {
+            "host": pghost,
+            "port": int(os.environ.get("PGPORT", "5432")),
+            "user": os.environ.get("PGUSER", ""),
+            "database": os.environ.get("PGDATABASE", "postgres"),
+            "sslmode": os.environ.get("PGSSLMODE", "require"),
+        }
+        # Only set password if explicitly provided (provisioned Lakebase uses SP auth without password)
+        pgpassword = os.environ.get("PGPASSWORD", "")
+        if pgpassword:
+            conn_params["password"] = pgpassword
         _pool = pool.ThreadedConnectionPool(
             minconn=1,
             maxconn=10,
-            host=pghost,
-            port=int(os.environ.get("PGPORT", "5432")),
-            user=os.environ.get("PGUSER", ""),
-            password=os.environ.get("PGPASSWORD", ""),
-            database=os.environ.get("PGDATABASE", "postgres"),
-            sslmode="require",
+            **conn_params,
         )
         logger.info(f"Connected to Lakebase at {pghost}")
     except Exception as e:
