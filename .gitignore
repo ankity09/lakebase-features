@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.env
+client/node_modules/
+client/build/
+client/dist/
+.vite/
+*.egg-info/
+.pytest_cache/
+.DS_Store

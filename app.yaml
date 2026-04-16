@@ -1,0 +1,30 @@
+command:
+  - uvicorn
+  - app.main:app
+  - --host
+  - 0.0.0.0
+  - --port
+  - 8000
+env:
+  - name: PGHOST
+    value: ""
+  - name: PGPORT
+    value: "5432"
+  - name: PGUSER
+    value: ""
+  - name: PGPASSWORD
+    value: ""
+  - name: PGDATABASE
+    value: "appshield"
+  - name: DATABRICKS_HOST
+    value: "https://fevm-serverless-stable-trvrmk.cloud.databricks.com"
+  - name: DATABRICKS_TOKEN
+    value: ""
+  - name: LAKEBASE_PROJECT_ID
+    value: ""
+  - name: FMAPI_ENDPOINT
+    value: "databricks-bge-small-en"
+  - name: DELTA_CATALOG
+    value: "appshield_catalog"
+  - name: DELTA_SCHEMA
+    value: "telemetry"
