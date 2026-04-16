@@ -2360,6 +2360,9 @@ function escapeHtml(str) {
 function navigateTo(page) {
   state.currentPage = page;
 
+  // Stop scale-to-zero polling when leaving that page
+  if (typeof stopS2zPolling === 'function') stopS2zPolling();
+
   // Update sidebar
   document.querySelectorAll('.nav-item').forEach(el => {
     el.classList.toggle('active', el.dataset.page === page);
@@ -3373,13 +3376,31 @@ async function applyAutoscaling() {
 /* ========================================================================
    SCALE TO ZERO
    ======================================================================== */
+let _s2zPollInterval = null;
+
 async function loadScaleToZero() {
   try {
     const data = await apiCall('GET', '/endpoint/status');
-    setScaleToZeroState(data.state || 'active');
+    setScaleToZeroState(data.state || data.raw_state?.toLowerCase() || 'active');
   } catch (e) {
-    setScaleToZeroState('active');
+    // If health check fails, endpoint might be suspended
+    setScaleToZeroState('suspended');
   }
+  // Auto-poll every 5s while on this page to show real state transitions
+  if (!_s2zPollInterval) {
+    _s2zPollInterval = setInterval(async () => {
+      try {
+        const data = await apiCall('GET', '/endpoint/status');
+        setScaleToZeroState(data.state || data.raw_state?.toLowerCase() || 'active');
+      } catch (e) {
+        setScaleToZeroState('suspended');
+      }
+    }, 5000);
+  }
+}
+
+function stopS2zPolling() {
+  if (_s2zPollInterval) { clearInterval(_s2zPollInterval); _s2zPollInterval = null; }
 }
 
 function setScaleToZeroState(s) {
@@ -3413,11 +3434,27 @@ async function scaleToZeroWake() {
 
   try {
     await apiCall('POST', '/endpoint/resume', {});
-    await new Promise(r => setTimeout(r, 1500 + Math.random() * 1500));
-    setScaleToZeroState('active');
-    stopStopwatch();
-    document.getElementById('s2z-last-resumed').textContent = new Date().toLocaleTimeString();
-    showToast('Instance resumed', 'success');
+    // Poll until endpoint is actually ACTIVE
+    const pollUntilActive = async () => {
+      for (let i = 0; i < 60; i++) {
+        await new Promise(r => setTimeout(r, 2000));
+        try {
+          const data = await apiCall('GET', '/endpoint/status');
+          const st = (data.state || data.raw_state || '').toLowerCase();
+          if (st === 'active' || st === 'idle') {
+            setScaleToZeroState('active');
+            stopStopwatch();
+            document.getElementById('s2z-last-resumed').textContent = new Date().toLocaleTimeString();
+            showToast('Instance resumed', 'success');
+            return;
+          }
+        } catch (e) { /* still starting */ }
+      }
+      showToast('Resume timed out — check Lakebase console', 'warning');
+      stopStopwatch();
+    };
+    pollUntilActive();
+    return;
   } catch (e) {
     // Demo: simulate resume time
     setTimeout(() => {
