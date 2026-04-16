@@ -1815,9 +1815,9 @@ code, pre, .mono { font-family: 'Space Mono', monospace; }
       <span class="chevron">&#9654;</span> What is this?
     </button>
     <div class="explainer-body">
-      <strong>Database Branching</strong> creates an isolated copy-on-write clone of your database — like git branches for your data.
-      Use branches for safe schema migrations, testing, staging environments, or development sandboxes.
-      Branches share storage with the parent, so they're instant to create and cost-effective.
+      <strong>Branching</strong> creates instant, zero-copy database copies — like git branches for your database.
+      Use branches to safely test schema migrations, onboard new product groups, or validate performance changes before merging to production.
+      Each branch has its own compute endpoint with no storage duplication.
     </div>
   </div>
 
@@ -2656,7 +2656,7 @@ async function crudRead(page) {
       filters,
       page: state.crudReadPage,
       page_size: state.crudReadPageSize,
-      sort_by: 'event_time',
+      sort_by: null,
       sort_order: 'DESC',
     });
     state.crudReadTotal = data.total;
@@ -3618,7 +3618,7 @@ async function vectorSearch() {
   container.innerHTML = Array(3).fill('<div class="skeleton skeleton-card" style="height:80px;margin-bottom:12px;"></div>').join('');
 
   try {
-    const data = await apiCall('POST', '/pgvector/search', { query, top_n: 10 });
+    const data = await apiCall('POST', '/vector/search', { query, top_n: 10 });
     renderVectorResults(data.results || []);
   } catch (e) {
     // Demo fallback: generate mock results
