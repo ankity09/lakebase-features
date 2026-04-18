@@ -117,15 +117,15 @@ Be concise, practical, and safety-conscious. If you're unsure about a repair pro
 # ---------------------------------------------------------------------------
 
 def _ensure_memory_table():
-    """Create the maintenance_memories table if it does not exist."""
+    """Create the appshield.agent_memories table if it does not exist."""
     try:
         execute_query(
             """
-            CREATE TABLE IF NOT EXISTS maintenance_memories (
+            CREATE TABLE IF NOT EXISTS appshield.agent_memories (
                 id          SERIAL PRIMARY KEY,
                 content     TEXT        NOT NULL,
-                category    TEXT        DEFAULT 'general',
-                equipment   TEXT        DEFAULT '',
+                memory_type    TEXT        DEFAULT 'general',
+                equipment_tag   TEXT        DEFAULT '',
                 embedding   vector(384),
                 created_at  TIMESTAMPTZ DEFAULT NOW()
             )
@@ -133,7 +133,7 @@ def _ensure_memory_table():
             fetch=False,
         )
     except Exception as e:
-        logger.warning(f"Could not ensure maintenance_memories table: {e}")
+        logger.warning(f"Could not ensure appshield.agent_memories table: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -147,9 +147,9 @@ def _recall_memories(embedding: list[float], top_n: int = 5) -> list[dict]:
     try:
         _, rows, _ = execute_query(
             """
-            SELECT id, content, category, equipment,
+            SELECT id, content, memory_type, equipment_tag,
                    1 - (embedding <=> %s::vector) AS relevance
-            FROM maintenance_memories
+            FROM appshield.agent_memories
             ORDER BY embedding <=> %s::vector
             LIMIT %s
             """,
@@ -165,7 +165,7 @@ def _recall_memories(embedding: list[float], top_n: int = 5) -> list[dict]:
 # Memory storage helper
 # ---------------------------------------------------------------------------
 
-def _store_memory(content: str, category: str = "general", equipment: str = "") -> int | None:
+def _store_memory(content: str, memory_type: str = "general", equipment_tag: str = "") -> int | None:
     """Embed and persist a new memory. Returns the new row id."""
     _ensure_memory_table()
     embedding = _embed_text(content)
@@ -173,11 +173,11 @@ def _store_memory(content: str, category: str = "general", equipment: str = "") 
     try:
         _, rows, _ = execute_query(
             """
-            INSERT INTO maintenance_memories (content, category, equipment, embedding)
+            INSERT INTO appshield.agent_memories (content, memory_type, equipment_tag, embedding)
             VALUES (%s, %s, %s, %s::vector)
             RETURNING id
             """,
-            (content, category, equipment, vec_literal),
+            (content, memory_type, equipment_tag, vec_literal),
         )
         return rows[0]["id"] if rows else None
     except Exception as e:
@@ -207,11 +207,11 @@ def memory_chat(body: ChatRequest):
         memory_lines = []
         for i, mem in enumerate(recalled, start=1):
             relevance = float(mem.get("relevance") or 0)
-            category = mem.get("category", "general")
-            equipment = mem.get("equipment", "")
-            eq_tag = f" [{equipment}]" if equipment else ""
+            memory_type = mem.get("memory_type", "general")
+            equipment_tag = mem.get("equipment_tag", "")
+            eq_tag = f" [{equipment_tag}]" if equipment_tag else ""
             memory_lines.append(
-                f"{i}. [{category}]{eq_tag} {mem['content'][:200]} "
+                f"{i}. [{memory_type}]{eq_tag} {mem['content'][:200]} "
                 f"(relevance: {relevance:.2f})"
             )
         memories_section = "## Your Maintenance Knowledge\n" + "\n".join(memory_lines)
@@ -259,8 +259,8 @@ def memory_chat(body: ChatRequest):
                     "You are a knowledge extractor. Given a maintenance conversation, "
                     "identify any NEW factual information about equipment failures, repairs, "
                     "or procedures. Return a JSON array of objects with keys: "
-                    "'content' (string), 'category' (one of: failure_mode, procedure, "
-                    "observation, part_number), 'equipment' (equipment ID or empty string). "
+                    "'content' (string), 'memory_type' (one of: failure_mode, procedure, "
+                    "observation, part_number), 'equipment_tag' (equipment ID or empty string). "
                     "Return [] if nothing new was learned. Return only valid JSON."
                 ),
             },
@@ -287,8 +287,8 @@ def memory_chat(body: ChatRequest):
                     if isinstance(fact, dict) and fact.get("content"):
                         _store_memory(
                             content=fact["content"],
-                            category=fact.get("category", "general"),
-                            equipment=fact.get("equipment", ""),
+                            memory_type=fact.get("memory_type", "general"),
+                            equipment_tag=fact.get("equipment_tag", ""),
                         )
                         new_memories_count += 1
     except Exception as e:
@@ -299,8 +299,8 @@ def memory_chat(body: ChatRequest):
         "recalled_memories": [
             {
                 "content": m["content"],
-                "category": m.get("category", "general"),
-                "equipment": m.get("equipment", ""),
+                "memory_type": m.get("memory_type", "general"),
+                "equipment_tag": m.get("equipment_tag", ""),
                 "relevance": round(float(m.get("relevance") or 0), 4),
             }
             for m in recalled
@@ -316,8 +316,8 @@ def list_memories():
     try:
         _, rows, latency_ms = execute_query(
             """
-            SELECT id, content, category, equipment, created_at
-            FROM maintenance_memories
+            SELECT id, content, memory_type, equipment_tag, created_at
+            FROM appshield.agent_memories
             ORDER BY created_at DESC
             """
         )
@@ -326,8 +326,8 @@ def list_memories():
                 {
                     "id": r["id"],
                     "content": r["content"],
-                    "category": r.get("category", "general"),
-                    "equipment": r.get("equipment", ""),
+                    "memory_type": r.get("memory_type", "general"),
+                    "equipment_tag": r.get("equipment_tag", ""),
                     "created_at": r["created_at"].isoformat() if r.get("created_at") else None,
                 }
                 for r in rows
@@ -345,7 +345,7 @@ def delete_all_memories():
     _ensure_memory_table()
     try:
         _, _, latency_ms = execute_query(
-            "DELETE FROM maintenance_memories",
+            "DELETE FROM appshield.agent_memories",
             fetch=False,
         )
         return {"deleted": True, "latency_ms": round(latency_ms, 2)}
@@ -360,8 +360,8 @@ def export_memories():
     try:
         _, rows, _ = execute_query(
             """
-            SELECT id, content, category, equipment, created_at
-            FROM maintenance_memories
+            SELECT id, content, memory_type, equipment_tag, created_at
+            FROM appshield.agent_memories
             ORDER BY created_at DESC
             """
         )
@@ -369,8 +369,8 @@ def export_memories():
             {
                 "id": r["id"],
                 "content": r["content"],
-                "category": r.get("category", "general"),
-                "equipment": r.get("equipment", ""),
+                "memory_type": r.get("memory_type", "general"),
+                "equipment_tag": r.get("equipment_tag", ""),
                 "created_at": r["created_at"].isoformat() if r.get("created_at") else None,
             }
             for r in rows
@@ -378,7 +378,7 @@ def export_memories():
         return JSONResponse(
             content=payload,
             headers={
-                "Content-Disposition": "attachment; filename=maintenance_memories.json"
+                "Content-Disposition": "attachment; filename=appshield.agent_memories.json"
             },
         )
     except Exception as e:
