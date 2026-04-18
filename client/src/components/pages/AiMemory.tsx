@@ -106,7 +106,7 @@ export function AiMemory() {
 
       const botMsg: ChatMessage = {
         role: 'assistant',
-        content: res.data.response,
+        content: res.data.reply || res.data.response || 'No response received.',
         recalledCount: recalled.length,
       }
       setMessages((prev) => [...prev, botMsg])
