@@ -52,12 +52,15 @@ from app.routers import recovery; app.include_router(recovery.router)
 from app.routers import memory; app.include_router(memory.router)
 from app.routers import loadtest; app.include_router(loadtest.router)
 
-# v2 React SPA (primary)
-build_dir = Path(__file__).parent.parent / "client" / "build"
-if build_dir.exists():
-    app.mount("/", StaticFiles(directory=str(build_dir), html=True), name="static")
-
 # v1 vanilla fallback at /v1/
 v1_dir = Path(__file__).parent / "frontend" / "v1"
 if v1_dir.exists():
     app.mount("/v1", StaticFiles(directory=str(v1_dir), html=True), name="v1")
+
+# v2 React SPA (primary) — must be last mount (catches all non-API routes)
+# Try app/static (deployed), then client/build (local dev)
+static_dir = Path(__file__).parent / "static"
+if not static_dir.exists():
+    static_dir = Path(__file__).parent.parent / "client" / "build"
+if static_dir.exists():
+    app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")
