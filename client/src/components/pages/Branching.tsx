@@ -741,8 +741,10 @@ export function Branching() {
 
   const fetchBranches = useCallback(async () => {
     try {
-      const res = await api.get<BranchInfo[]>('/branches')
-      setBranches(res.data)
+      const res = await api.get('/branches')
+      const data = res.data
+      // API returns { branches: [...] }, not a direct array
+      setBranches(Array.isArray(data) ? data : data.branches ?? [])
     } catch {
       // Silently handle — branches list stays empty
     } finally {
