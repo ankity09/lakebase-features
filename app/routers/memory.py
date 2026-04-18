@@ -30,7 +30,7 @@ def _embed_text(text: str) -> list[float]:
     """Embed text via FMAPI BGE-small. Falls back to random vector."""
     try:
         host = os.environ.get("DATABRICKS_HOST", "")
-        endpoint = os.environ.get("FMAPI_ENDPOINT", "databricks-bge-small-en")
+        endpoint = os.environ.get("FMAPI_ENDPOINT", "databricks-bge-large-en")
         if not host:
             from databricks.sdk import WorkspaceClient
             w = WorkspaceClient()
@@ -73,7 +73,7 @@ def _chat_llm(messages: list[dict]) -> str:
     """Call FMAPI chat endpoint. Falls back to empty string."""
     try:
         host = os.environ.get("DATABRICKS_HOST", "")
-        endpoint = os.environ.get("FMAPI_CHAT_ENDPOINT", "databricks-claude-sonnet-4v")
+        endpoint = os.environ.get("FMAPI_CHAT_ENDPOINT", "databricks-claude-sonnet-4-6")
         if not host:
             from databricks.sdk import WorkspaceClient
             w = WorkspaceClient()

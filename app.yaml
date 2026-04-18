@@ -7,7 +7,9 @@ command:
   - 8000
 env:
   - name: FMAPI_ENDPOINT
-    value: "databricks-bge-small-en"
+    value: "databricks-bge-large-en"
+  - name: FMAPI_CHAT_ENDPOINT
+    value: "databricks-claude-sonnet-4-6"
   - name: DELTA_CATALOG
     value: "appshield_catalog"
   - name: DELTA_SCHEMA
