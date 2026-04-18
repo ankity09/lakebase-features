@@ -537,3 +537,80 @@ def seed_if_needed() -> None:
             logger.info("Read replica endpoint already exists")
     except Exception as e:
         logger.warning(f"Read replica creation skipped: {e}")
+
+    # Create agent_memories table for AI Memory page
+    try:
+        with get_conn() as conn:
+            conn.autocommit = True
+            with conn.cursor() as cur:
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS appshield.agent_memories (
+                        id SERIAL PRIMARY KEY,
+                        content TEXT NOT NULL,
+                        memory_type VARCHAR(32),
+                        equipment_tag VARCHAR(64),
+                        importance FLOAT DEFAULT 0.5,
+                        embedding vector(384),
+                        access_count INT DEFAULT 0,
+                        created_at TIMESTAMPTZ DEFAULT NOW()
+                    )
+                """)
+                cur.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_memories_hnsw
+                    ON appshield.agent_memories USING hnsw (embedding vector_cosine_ops)
+                """)
+
+                # Check if already seeded
+                cur.execute("SELECT COUNT(*) FROM appshield.agent_memories")
+                if cur.fetchone()[0] == 0:
+                    logger.info("Seeding agent_memories (20 rows)...")
+                    memories = [
+                        ("Hydraulic press HP-L4-001 has a recurring leak in the main cylinder seal. Usually manifests after 200+ hours of continuous operation.", "failure_mode", "HP-L4-001", 0.9),
+                        ("CNC machine CNC-M2-014 overheats when running high-RPM aluminum jobs for more than 4 hours. Coolant flow rate needs to be increased to 12 L/min.", "failure_mode", "CNC-M2-014", 0.85),
+                        ("Conveyor belt CONV-B1-008 drifts left under heavy loads. The tracking roller on the return side needs adjustment every 500 hours.", "failure_mode", "CONV-B1-008", 0.8),
+                        ("Welding robot WELD-C3-012 throws E4507 error intermittently. Root cause is a loose encoder cable on joint 3.", "failure_mode", "WELD-C3-012", 0.9),
+                        ("Robotic arm ROB-A7-003 loses calibration after power cycling. Always run the homing sequence before resuming production.", "failure_mode", "ROB-A7-003", 0.85),
+                        ("Use Parker 512HB seals for HP-L4 series hydraulic presses. Flexitallic gaskets fail within 3 months under our operating pressures.", "part_preference", "HP-L4-001", 0.85),
+                        ("SKF 6205-2RS bearings are the go-to for CONV-B1 series conveyor rollers. NSK alternatives work but have 20% shorter service life.", "part_preference", "CONV-B1-008", 0.75),
+                        ("For CNC coolant systems, use Castrol Alusol SL 51 XBB. It handles aluminum machining better than the generic stuff.", "part_preference", "CNC-M2-014", 0.7),
+                        ("Lincoln Electric PowerMig 210 MP is the backup welder for WELD-C3 series robots. Keep one in storage for emergency swaps.", "part_preference", "WELD-C3-012", 0.65),
+                        ("HP-L4-001 cylinder seal replacement: 1) Depressurize system. 2) Remove 4x M16 bolts on cylinder head. 3) Extract old seal with hook tool. 4) Clean groove with brake cleaner. 5) Install new Parker 512HB seal. 6) Torque bolts to 180 Nm. 7) Pressurize to 50% for 10 min leak test.", "procedure", "HP-L4-001", 0.95),
+                        ("CNC-M2-014 coolant flush procedure: 1) Drain old coolant. 2) Run clean water cycle for 15 min. 3) Mix new Castrol at 8% concentration. 4) Fill reservoir. 5) Run circulation pump for 5 min. 6) Check flow rate at spindle (target 12 L/min).", "procedure", "CNC-M2-014", 0.8),
+                        ("Conveyor tracking adjustment: 1) Loosen idler frame bolts. 2) Run belt empty at half speed. 3) Adjust return roller angle 2-3 degrees toward drift side. 4) Tighten bolts. 5) Run loaded for 30 min to verify.", "procedure", "CONV-B1-008", 0.75),
+                        ("WELD-C3-012 encoder cable fix: 1) Power off robot. 2) Remove joint 3 cover (6x M5 screws). 3) Reseat the 12-pin Molex connector. 4) Apply thread locker to the retaining screw. 5) Reassemble. 6) Run calibration sequence.", "procedure", "WELD-C3-012", 0.85),
+                        ("HP-L4-001 makes a clicking noise at the top of each stroke. This is normal — it's the directional control valve switching. Only investigate if clicking becomes irregular.", "machine_quirk", "HP-L4-001", 0.6),
+                        ("CNC-M2-014 shows a spindle load warning at exactly 82% — this is a firmware bug in version 4.2.1. The actual limit is 95%. Ignore the warning unless load exceeds 90%.", "machine_quirk", "CNC-M2-014", 0.7),
+                        ("ROB-A7-003 has a 0.3mm backlash on joint 2 that can't be fully eliminated. Account for it in precision pick-and-place programs by approaching from the same direction.", "machine_quirk", "ROB-A7-003", 0.75),
+                        ("CONV-B1-008 speed sensor reads 2% low compared to tachometer. This is a known calibration offset — don't adjust the sensor, just factor it into throughput calculations.", "machine_quirk", "CONV-B1-008", 0.5),
+                        ("Parker Hannifin — primary seal supplier. Order through distributor Motion Industries (account #MFG-4421). Standard lead time: 3-5 business days. Emergency overnight available at 3x cost.", "vendor_info", None, 0.6),
+                        ("SKF bearings — order through Applied Industrial Technologies. Bulk discount kicks in at 50+ units. Lead time: 1-2 weeks standard, 3 days expedited.", "vendor_info", None, 0.55),
+                        ("Castrol industrial lubricants — direct from Castrol Industrial (rep: Sarah Chen, sarah.chen@castrol.com). Minimum order 200L drum. Lead time: 1 week.", "vendor_info", None, 0.5),
+                    ]
+                    for content, mem_type, eq_tag, importance in memories:
+                        embedding = [random.gauss(0, 1) for _ in range(384)]
+                        norm = sum(x*x for x in embedding) ** 0.5
+                        embedding = [x / norm for x in embedding]
+                        cur.execute(
+                            "INSERT INTO appshield.agent_memories (content, memory_type, equipment_tag, importance, embedding) VALUES (%s, %s, %s, %s, %s::vector)",
+                            (content, mem_type, eq_tag, importance, str(embedding))
+                        )
+                    logger.info("Inserted 20 agent_memories rows.")
+    except Exception as e:
+        logger.warning(f"agent_memories setup: {e}")
+
+    # Create loadtest scratch table for Autoscaling page
+    try:
+        with get_conn() as conn:
+            conn.autocommit = True
+            with conn.cursor() as cur:
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS appshield.loadtest_events (
+                        id SERIAL PRIMARY KEY,
+                        event_type VARCHAR(32),
+                        payload JSONB,
+                        created_at TIMESTAMPTZ DEFAULT NOW()
+                    )
+                """)
+        logger.info("loadtest_events table ready.")
+    except Exception as e:
+        logger.warning(f"loadtest_events setup: {e}")
