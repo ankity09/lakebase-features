@@ -6,7 +6,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ReferenceLine,
   Legend,
   ResponsiveContainer,
 } from 'recharts'
@@ -16,13 +15,8 @@ import { BeforeAfter } from '@/components/shared/BeforeAfter'
 import { useInterval } from '@/hooks/useInterval'
 import api from '@/lib/api'
 
-interface CuDataPoint {
-  time: string
-  cu: number
-}
-
 interface LatencyDataPoint {
-  time: string
+  ts: string
   p50: number
   p99: number
 }
@@ -38,12 +32,11 @@ const QPS_LEVELS = [
 export function Autoscaling() {
   const [targetQps, setTargetQps] = useState(0)
   const [running, setRunning] = useState(false)
-  const [cuHistory, setCuHistory] = useState<CuDataPoint[]>([])
   const [latencyHistory, setLatencyHistory] = useState<LatencyDataPoint[]>([])
   const [totalQueries, setTotalQueries] = useState(0)
   const [errors, setErrors] = useState(0)
   const [elapsed, setElapsed] = useState(0)
-  const [currentCU, setCurrentCU] = useState(4)
+  const [activeConnections, setActiveConnections] = useState<number | null>(null)
 
   const handleStart = useCallback(async (qps: number) => {
     setTargetQps(qps)
@@ -74,27 +67,21 @@ export function Autoscaling() {
     setTargetQps(0)
   }, [])
 
+  // Poll loadtest status and active connections
   useInterval(
     async () => {
       try {
-        const [autoscaleRes, statusRes] = await Promise.all([
-          api.get('/autoscaling'),
+        const [statusRes, metricsRes] = await Promise.all([
           api.get('/loadtest/status'),
-        ])
-
-        const cu = autoscaleRes.data.current_cu ?? 4
-        setCurrentCU(cu)
-        setCuHistory((prev) => [
-          ...prev,
-          { time: new Date().toISOString(), cu },
+          api.get('/monitoring/metrics').catch(() => null),
         ])
 
         const status = statusRes.data
         if (status.latency_history) {
           setLatencyHistory(
             status.latency_history.map(
-              (pt: { time: string; p50: number; p99: number }) => ({
-                time: pt.time,
+              (pt: { ts?: string; time?: string; p50: number; p99: number }) => ({
+                ts: pt.ts ?? pt.time ?? new Date().toISOString(),
                 p50: pt.p50,
                 p99: pt.p99,
               })
@@ -104,6 +91,14 @@ export function Autoscaling() {
         setTotalQueries(status.total_queries ?? 0)
         setErrors(status.errors ?? 0)
         setElapsed(status.elapsed_seconds ?? 0)
+
+        if (metricsRes?.data) {
+          const conn =
+            metricsRes.data.active_connections ??
+            metricsRes.data.connections ??
+            null
+          setActiveConnections(typeof conn === 'number' ? conn : null)
+        }
       } catch {
         /* ignore polling errors */
       }
@@ -115,18 +110,6 @@ export function Autoscaling() {
     latencyHistory.length > 0
       ? Math.max(...latencyHistory.map((pt) => pt.p99))
       : 0
-
-  const formatTime = (isoStr: string) => {
-    try {
-      return new Date(isoStr).toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      })
-    } catch {
-      return isoStr
-    }
-  }
 
   const left = (
     <div className="flex flex-col gap-6">
@@ -151,20 +134,26 @@ export function Autoscaling() {
         }}
       />
 
-      {/* Cost Ticker */}
-      <div className="rounded-xl bg-[var(--color-bg-tertiary)] p-4">
-        <div className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
-          Estimated Cost
+      {/* Demo Tip */}
+      <div className="rounded-xl border border-[var(--color-info)] bg-[var(--color-info)]/5 p-4">
+        <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-info)]">
+          Demo Tip
         </div>
-        <div className="mt-1 font-[var(--font-mono)] text-2xl font-bold text-[var(--color-accent)]">
-          ${(currentCU * 0.111).toFixed(2)}/hr
-        </div>
-        <div className="mt-0.5 text-xs text-[var(--color-text-muted)]">
-          Based on current CU
-        </div>
+        <p className="text-sm leading-relaxed text-[var(--color-text-secondary)]">
+          Open the{' '}
+          <strong className="text-[var(--color-text-primary)]">
+            Lakebase dashboard
+          </strong>{' '}
+          in a split screen to show the real-time RAM/CU chart alongside this
+          traffic generator. The dashboard shows allocated memory scaling up as
+          queries hit the database.
+        </p>
+        <p className="mt-2 text-xs text-[var(--color-text-muted)]">
+          Databricks → Lakebase → lakebase-features → Monitoring tab
+        </p>
       </div>
 
-      {/* Key Stat Card */}
+      {/* Key Stat Card — shown after load test starts */}
       {totalQueries > 0 && (
         <div className="rounded-xl border border-[var(--color-accent)] bg-[var(--color-bg-tertiary)] p-4">
           <p className="text-sm font-bold text-[var(--color-accent)]">
@@ -203,7 +192,7 @@ export function Autoscaling() {
         <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-[var(--color-bg-primary)]">
           <div
             className="h-full rounded-full bg-[var(--color-accent)] transition-all duration-500"
-            style={{ width: `${(targetQps / 200) * 100}%` }}
+            style={{ width: `${Math.min((targetQps / 1000) * 100, 100)}%` }}
           />
         </div>
 
@@ -217,60 +206,33 @@ export function Autoscaling() {
         )}
       </div>
 
-      {/* CU Chart */}
+      {/* Active Connections Gauge */}
       <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-tertiary)] p-4">
         <h3 className="mb-3 text-sm font-semibold text-[var(--color-text-primary)]">
-          Compute Units
+          Active Connections
         </h3>
-        <ResponsiveContainer width="100%" height={200}>
-          <LineChart data={cuHistory}>
-            <CartesianGrid
-              strokeDasharray="3 3"
-              stroke="var(--color-border)"
+        <div className="flex items-end gap-3">
+          <span className="font-[var(--font-mono)] text-4xl font-bold text-[var(--color-accent)]">
+            {activeConnections !== null ? activeConnections : '—'}
+          </span>
+          <span className="mb-1 text-xs text-[var(--color-text-muted)]">
+            {running ? 'live · polling every 3s' : 'start a load level to monitor'}
+          </span>
+        </div>
+        {/* Mini bar representing connection load */}
+        {activeConnections !== null && (
+          <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-[var(--color-bg-primary)]">
+            <div
+              className="h-full rounded-full bg-[var(--color-accent)] transition-all duration-700"
+              style={{ width: `${Math.min((activeConnections / 100) * 100, 100)}%` }}
             />
-            <XAxis
-              dataKey="time"
-              tickFormatter={formatTime}
-              tick={{ fill: 'var(--color-text-muted)', fontSize: 10 }}
-              stroke="var(--color-border)"
-            />
-            <YAxis
-              domain={[0, 16]}
-              tick={{ fill: 'var(--color-text-muted)', fontSize: 10 }}
-              stroke="var(--color-border)"
-            />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: 'var(--color-bg-secondary)',
-                border: '1px solid var(--color-border)',
-                borderRadius: 8,
-                color: 'var(--color-text-primary)',
-                fontSize: 12,
-              }}
-              labelFormatter={formatTime}
-            />
-            <ReferenceLine
-              y={2}
-              stroke="var(--color-text-muted)"
-              strokeDasharray="4 4"
-              label={{ value: 'Min', fill: 'var(--color-text-muted)', fontSize: 10 }}
-            />
-            <ReferenceLine
-              y={16}
-              stroke="var(--color-text-muted)"
-              strokeDasharray="4 4"
-              label={{ value: 'Max', fill: 'var(--color-text-muted)', fontSize: 10 }}
-            />
-            <Line
-              type="monotone"
-              dataKey="cu"
-              stroke="var(--color-accent)"
-              strokeWidth={2}
-              dot={false}
-              isAnimationActive={false}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+          </div>
+        )}
+        {activeConnections !== null && (
+          <p className="mt-1.5 text-xs text-[var(--color-text-muted)]">
+            {activeConnections} / 100 max connections
+          </p>
+        )}
       </div>
 
       {/* Latency Chart */}
@@ -285,10 +247,20 @@ export function Autoscaling() {
               stroke="var(--color-border)"
             />
             <XAxis
-              dataKey="time"
-              tickFormatter={formatTime}
+              dataKey="ts"
               tick={{ fill: 'var(--color-text-muted)', fontSize: 10 }}
               stroke="var(--color-border)"
+              tickFormatter={(val) => {
+                try {
+                  return new Date(val).toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                  })
+                } catch {
+                  return ''
+                }
+              }}
             />
             <YAxis
               tick={{ fill: 'var(--color-text-muted)', fontSize: 10 }}
@@ -302,7 +274,17 @@ export function Autoscaling() {
                 color: 'var(--color-text-primary)',
                 fontSize: 12,
               }}
-              labelFormatter={formatTime}
+              labelFormatter={(val) => {
+                try {
+                  return new Date(val).toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                  })
+                } catch {
+                  return String(val)
+                }
+              }}
             />
             <Legend
               wrapperStyle={{ fontSize: 11, color: 'var(--color-text-muted)' }}
