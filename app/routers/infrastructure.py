@@ -43,20 +43,30 @@ def get_autoscaling():
         min_cu = status.get("autoscaling_limit_min_cu", 0)
         max_cu = status.get("autoscaling_limit_max_cu", 0)
 
-        # Detect actual current CU from effective_cache_size
-        # This reflects the total allocated RAM which scales with CU
-        # Mapping: 0.5 CU ≈ 1 GB, 1 CU ≈ 2 GB, 2 CU ≈ 4 GB, 4 CU ≈ 8 GB, 8 CU ≈ 16 GB
+        # Detect actual current CU via a FRESH connection (not from the pool)
+        # pg_settings values are set at connection startup and don't update within a session
+        # so we must open a new connection each time to see the current compute size
         current_cu = min_cu
         try:
-            _, rows, _ = execute_query(
-                "SELECT setting::bigint * 8192 as cache_bytes FROM pg_settings WHERE name = 'effective_cache_size'"
+            password = os.environ.get("PGPASSWORD", "") or _generate_lakebase_token()
+            fresh_conn = psycopg2.connect(
+                host=os.environ.get("PGHOST", ""),
+                port=int(os.environ.get("PGPORT", "5432")),
+                user=os.environ.get("PGUSER", ""),
+                password=password,
+                database=os.environ.get("PGDATABASE", "postgres"),
+                sslmode=os.environ.get("PGSSLMODE", "require"),
             )
-            if rows:
-                cache_bytes = rows[0]["cache_bytes"]
-                cache_gb = cache_bytes / (1024 * 1024 * 1024)
-                # ~2 GB per CU
-                estimated_cu = round(cache_gb / 2, 1)
-                current_cu = max(min_cu, min(max_cu, estimated_cu))
+            try:
+                with fresh_conn.cursor() as cur:
+                    cur.execute("SELECT setting::bigint * 8192 FROM pg_settings WHERE name = 'effective_cache_size'")
+                    row = cur.fetchone()
+                    if row:
+                        cache_gb = row[0] / (1024 * 1024 * 1024)
+                        estimated_cu = round(cache_gb / 2, 1)
+                        current_cu = max(min_cu, min(max_cu, estimated_cu))
+            finally:
+                fresh_conn.close()
         except Exception as pg_err:
             logger.warning("Could not detect current CU: %s", pg_err)
 
