@@ -3,6 +3,9 @@ import { IconRail } from '@/components/shell/IconRail'
 import { FeatureStore } from '@/components/pages/FeatureStore'
 import { Branching } from '@/components/pages/Branching'
 import { CrudQuery } from '@/components/pages/CrudQuery'
+import { Recovery } from '@/components/pages/Recovery'
+import { Autoscaling } from '@/components/pages/Autoscaling'
+import { AiMemory } from '@/components/pages/AiMemory'
 
 export default function App() {
   return (
@@ -15,9 +18,9 @@ export default function App() {
             <Route path="/feature-store" element={<FeatureStore />} />
             <Route path="/branching" element={<Branching />} />
             <Route path="/crud" element={<CrudQuery />} />
-            <Route path="/recovery" element={<div className="p-6 text-[var(--color-text-primary)]">Recovery — Plan B</div>} />
-            <Route path="/ai-memory" element={<div className="p-6 text-[var(--color-text-primary)]">AI Memory — Plan B</div>} />
-            <Route path="/autoscaling" element={<div className="p-6 text-[var(--color-text-primary)]">Autoscaling — Plan B</div>} />
+            <Route path="/recovery" element={<Recovery />} />
+            <Route path="/ai-memory" element={<AiMemory />} />
+            <Route path="/autoscaling" element={<Autoscaling />} />
           </Routes>
         </main>
       </div>
