@@ -102,21 +102,70 @@ def _loadtest_worker():
         try:
             start = time.perf_counter()
 
-            # 80% reads, 20% writes
-            if random.random() < 0.8:
+            # Mix of heavy queries to actually stress the database
+            query_type = random.random()
+            if query_type < 0.3:
+                # Heavy aggregation — GROUP BY with multiple columns
                 customer = random.choice(CUSTOMERS)
                 with conn.cursor() as cur:
                     cur.execute(
-                        "SELECT COUNT(*) FROM appshield.telemetry_events WHERE customer_id = %s",
+                        """SELECT customer_id, region, http_method,
+                           COUNT(*) as cnt, AVG(payload_size_bytes) as avg_payload,
+                           MIN(event_time) as first_seen, MAX(event_time) as last_seen
+                           FROM appshield.telemetry_events
+                           WHERE customer_id = %s
+                           GROUP BY customer_id, region, http_method
+                           ORDER BY cnt DESC""",
                         (customer,)
                     )
-                    cur.fetchone()
-            else:
+                    cur.fetchall()
+            elif query_type < 0.5:
+                # Full table scan with sorting
                 with conn.cursor() as cur:
                     cur.execute(
-                        "INSERT INTO appshield.loadtest_events (event_type, payload) VALUES (%s, %s)",
-                        ("loadtest", json.dumps({"ts": time.time(), "qps": qps}))
+                        """SELECT customer_id, COUNT(*) as cnt,
+                           SUM(CASE WHEN response_code >= 400 THEN 1 ELSE 0 END) as errors,
+                           AVG(payload_size_bytes) as avg_payload
+                           FROM appshield.telemetry_events
+                           GROUP BY customer_id
+                           ORDER BY cnt DESC LIMIT 20"""
                     )
+                    cur.fetchall()
+            elif query_type < 0.7:
+                # Join features with predictions
+                customer = random.choice(CUSTOMERS)
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """SELECT f.customer_id, f.time_bucket, f.request_count_5min,
+                           p.app_classification, p.confidence
+                           FROM appshield.customer_features f
+                           LEFT JOIN appshield.model_predictions p ON f.customer_id = p.customer_id
+                           WHERE f.customer_id = %s
+                           ORDER BY f.time_bucket DESC LIMIT 50""",
+                        (customer,)
+                    )
+                    cur.fetchall()
+            elif query_type < 0.85:
+                # Write — batch insert
+                with conn.cursor() as cur:
+                    for _ in range(5):
+                        cur.execute(
+                            "INSERT INTO appshield.loadtest_events (event_type, payload) VALUES (%s, %s)",
+                            ("loadtest", json.dumps({"ts": time.time(), "qps": qps, "customer": random.choice(CUSTOMERS)}))
+                        )
+            else:
+                # Window function query
+                customer = random.choice(CUSTOMERS)
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """SELECT customer_id, event_time, response_code, payload_size_bytes,
+                           AVG(payload_size_bytes) OVER (PARTITION BY customer_id ORDER BY event_time ROWS BETWEEN 10 PRECEDING AND CURRENT ROW) as rolling_avg
+                           FROM appshield.telemetry_events
+                           WHERE customer_id = %s
+                           ORDER BY event_time DESC LIMIT 100""",
+                        (customer,)
+                    )
+                    cur.fetchall()
 
             latency_ms = (time.perf_counter() - start) * 1000
             window_samples.append(latency_ms)
@@ -161,7 +210,7 @@ def _loadtest_worker():
 @router.post("/loadtest/start")
 def start_loadtest(body: StartRequest):
     """Start generating traffic at the specified QPS (max 200)."""
-    qps = min(body.qps, 200)  # Cap at 200
+    qps = min(body.qps, 1000)  # Cap at 1000
 
     with _lock:
         # Stop existing if running
@@ -178,7 +227,7 @@ def start_loadtest(body: StartRequest):
         _state["errors"] = 0
         _state["start_time"] = time.time()
         _state["latency_history"].clear()
-        _state["connections"] = _create_connections(min(10, max(1, qps // 20 + 1)))
+        _state["connections"] = _create_connections(min(20, max(2, qps // 25 + 1)))
 
         if not _state["connections"]:
             _state["running"] = False

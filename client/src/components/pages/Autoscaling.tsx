@@ -29,10 +29,10 @@ interface LatencyDataPoint {
 
 const QPS_LEVELS = [
   { label: 'Idle', qps: 0 },
-  { label: 'Light (10)', qps: 10 },
-  { label: 'Medium (50)', qps: 50 },
-  { label: 'Heavy (100)', qps: 100 },
-  { label: 'Spike (200)', qps: 200 },
+  { label: 'Light (50)', qps: 50 },
+  { label: 'Medium (200)', qps: 200 },
+  { label: 'Heavy (500)', qps: 500 },
+  { label: 'Spike (1000)', qps: 1000 },
 ] as const
 
 export function Autoscaling() {
