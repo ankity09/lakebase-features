@@ -43,22 +43,22 @@ def get_autoscaling():
         min_cu = status.get("autoscaling_limit_min_cu", 0)
         max_cu = status.get("autoscaling_limit_max_cu", 0)
 
-        # Detect actual current CU from shared_buffers setting
-        # shared_buffers scales linearly with CU: ~460 MB per CU (in 8KB pages)
+        # Detect actual current CU from effective_cache_size
+        # This reflects the total allocated RAM which scales with CU
+        # Mapping: 0.5 CU ≈ 1 GB, 1 CU ≈ 2 GB, 2 CU ≈ 4 GB, 4 CU ≈ 8 GB, 8 CU ≈ 16 GB
         current_cu = min_cu
         try:
             _, rows, _ = execute_query(
-                "SELECT setting::bigint * 8192 as shared_bytes FROM pg_settings WHERE name = 'shared_buffers'"
+                "SELECT setting::bigint * 8192 as cache_bytes FROM pg_settings WHERE name = 'effective_cache_size'"
             )
             if rows:
-                shared_bytes = rows[0]["shared_bytes"]
-                shared_mb = shared_bytes / (1024 * 1024)
-                # Map: 0.25 CU ≈ 57MB, 0.5 CU ≈ 115MB, 1 CU ≈ 230MB, 2 CU ≈ 460MB, etc.
-                estimated_cu = round(shared_mb / 230, 2)
-                # Clamp to min/max
+                cache_bytes = rows[0]["cache_bytes"]
+                cache_gb = cache_bytes / (1024 * 1024 * 1024)
+                # ~2 GB per CU
+                estimated_cu = round(cache_gb / 2, 1)
                 current_cu = max(min_cu, min(max_cu, estimated_cu))
         except Exception as pg_err:
-            logger.warning("Could not detect current CU from shared_buffers: %s", pg_err)
+            logger.warning("Could not detect current CU: %s", pg_err)
 
         return {
             "min_cu": min_cu,
