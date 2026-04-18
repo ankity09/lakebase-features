@@ -60,8 +60,9 @@ export function FeatureStore() {
   useEffect(() => {
     let cancelled = false
     setTableLoading(true)
+    const [schema, table] = theme.featureTableName.split('.')
     api
-      .get('/features/table', { params: { page: tablePage, page_size: 10 } })
+      .get('/features/table', { params: { page: tablePage, page_size: 10, schema, table } })
       .then((res) => {
         if (!cancelled) setTableData(res.data)
       })
@@ -74,7 +75,7 @@ export function FeatureStore() {
     return () => {
       cancelled = true
     }
-  }, [tablePage])
+  }, [tablePage, theme])
 
   const handleLookup = useCallback(async () => {
     if (!entityId.trim()) return
@@ -83,9 +84,11 @@ export function FeatureStore() {
     setBatchResult(null)
 
     try {
+      const [featureSchema, featureTable] = theme.featureTableName.split('.')
+      const featureParams = { schema: featureSchema, table: featureTable }
       const [onlineRes, batchRes] = await Promise.all([
-        api.get(`/features/${encodeURIComponent(entityId)}`),
-        api.get(`/features/${encodeURIComponent(entityId)}/batch`),
+        api.get(`/features/${encodeURIComponent(entityId)}`, { params: featureParams }),
+        api.get(`/features/${encodeURIComponent(entityId)}/batch`, { params: featureParams }),
       ])
 
       setLookupResult(onlineRes.data)

@@ -183,23 +183,23 @@ function RightPanel() {
   useEffect(() => {
     setTablesLoading(true)
     api
-      .get('/tables')
+      .get('/tables', { params: { schema: theme.schema } })
       .then((r) => {
         const list = Array.isArray(r.data) ? r.data : r.data.tables ?? []
         setTables(list)
-        if (list.length > 0 && !selectedTable) {
+        if (list.length > 0) {
           setSelectedTable(list[0].table_name)
         }
       })
       .catch(() => {})
       .finally(() => setTablesLoading(false))
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [theme.schema]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- Fetch schema when table changes ---
   useEffect(() => {
     if (!selectedTable) return
     api
-      .get(`/tables/${selectedTable}/schema`)
+      .get(`/tables/${selectedTable}/schema`, { params: { schema: theme.schema } })
       .then((r) => {
         const cols = Array.isArray(r.data) ? r.data : r.data.columns ?? []
         setSchema(cols)
@@ -255,12 +255,12 @@ function RightPanel() {
     try {
       const filters: Record<string, string> = {}
       if (filterEntityId.trim()) {
-        filters[theme.entityIdLabel.toLowerCase().replace(/\s+/g, '_')] =
-          filterEntityId.trim()
+        filters[theme.entityIdColumn] = filterEntityId.trim()
       }
       const r = await api.post<QueryResponse>(
         `/tables/${selectedTable}/query`,
-        { filters, page: 1, page_size: 20 }
+        { filters, page: 1, page_size: 20 },
+        { params: { schema: theme.schema } }
       )
       setReadResult(r.data)
     } catch {
@@ -279,9 +279,11 @@ function RightPanel() {
       Object.entries(insertFields).forEach(([k, v]) => {
         if (v.trim()) cleaned[k] = v.trim()
       })
-      await api.post(`/tables/${selectedTable}/insert`, {
-        records: [cleaned],
-      })
+      await api.post(
+        `/tables/${selectedTable}/insert`,
+        { records: [cleaned] },
+        { params: { schema: theme.schema } }
+      )
       setInsertMsg('Row inserted successfully')
     } catch (err: any) {
       setInsertMsg(
