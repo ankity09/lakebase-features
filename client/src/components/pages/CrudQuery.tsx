@@ -183,11 +183,12 @@ function RightPanel() {
   useEffect(() => {
     setTablesLoading(true)
     api
-      .get<TableInfo[]>('/tables')
+      .get('/tables')
       .then((r) => {
-        setTables(r.data)
-        if (r.data.length > 0 && !selectedTable) {
-          setSelectedTable(r.data[0].table_name)
+        const list = Array.isArray(r.data) ? r.data : r.data.tables ?? []
+        setTables(list)
+        if (list.length > 0 && !selectedTable) {
+          setSelectedTable(list[0].table_name)
         }
       })
       .catch(() => {})
@@ -198,11 +199,12 @@ function RightPanel() {
   useEffect(() => {
     if (!selectedTable) return
     api
-      .get<ColumnInfo[]>(`/tables/${selectedTable}/schema`)
+      .get(`/tables/${selectedTable}/schema`)
       .then((r) => {
-        setSchema(r.data)
+        const cols = Array.isArray(r.data) ? r.data : r.data.columns ?? []
+        setSchema(cols)
         const blank: Record<string, string> = {}
-        r.data.forEach((c) => {
+        cols.forEach((c: ColumnInfo) => {
           blank[c.name] = ''
         })
         setInsertFields(blank)
