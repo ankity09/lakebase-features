@@ -10,22 +10,23 @@ import { cn } from '@/lib/utils'
 /* ---------- Types ---------- */
 
 interface SnapshotState {
-  id: string
+  snapshot_id: string
   timestamp: string
   row_count: number
 }
 
 interface RestoreResult {
+  status: string
   rows_recovered: number
   elapsed_seconds: number
-  branch: string
-  method: string
+  branch_used: string
 }
 
 interface DemoTableResponse {
-  columns: string[]
   rows: Record<string, unknown>[]
   row_count: number
+  showing?: number
+  timestamp?: string
 }
 
 /* ---------- Timeline ---------- */
@@ -202,7 +203,7 @@ export function Recovery() {
     clearError()
     try {
       await api.post('/recovery/corrupt')
-      setTableData({ columns: tableData?.columns ?? [], rows: [], row_count: 0 })
+      setTableData({ rows: [], row_count: 0 })
       setStep(4)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to delete data'
@@ -478,7 +479,7 @@ export function Recovery() {
         ) : (
           <>
             <DataTable
-              columns={tableData.columns}
+              columns={tableData.rows.length > 0 ? Object.keys(tableData.rows[0]) : []}
               rows={tableData.rows}
               maxRows={5}
             />
@@ -526,7 +527,7 @@ export function Recovery() {
                   PITR Branch
                 </div>
                 <div className="mt-0.5 font-[var(--font-mono)] text-sm font-semibold text-[var(--color-text-primary)]">
-                  {restoreResult.branch}
+                  {restoreResult.branch_used}
                 </div>
               </div>
               <div className="rounded-lg bg-[var(--color-bg-tertiary)] px-3 py-2">

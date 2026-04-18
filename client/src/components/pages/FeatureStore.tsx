@@ -13,9 +13,11 @@ import type { FeatureLookupResponse } from '@/types'
 interface FeatureTableResponse {
   columns: string[]
   rows: Record<string, unknown>[]
-  row_count: number
+  total: number
   page: number
   page_size: number
+  total_pages?: number
+  latency_ms?: number
 }
 
 const architectureNodes = [
@@ -302,7 +304,7 @@ export function FeatureStore() {
 
         <div className="mt-3 flex items-center justify-between">
           <span className="rounded-md bg-[var(--color-bg-hover)] px-2 py-0.5 font-[var(--font-mono)] text-[10px] text-[var(--color-text-muted)]">
-            {tableData ? `${tableData.row_count} rows total` : '---'}
+            {tableData ? `${tableData.total} rows total` : '---'}
           </span>
           <div className="flex gap-1.5">
             <button
@@ -319,7 +321,7 @@ export function FeatureStore() {
               onClick={() => setTablePage((p) => p + 1)}
               disabled={
                 tableData != null &&
-                tablePage * 10 >= tableData.row_count
+                tablePage * 10 >= tableData.total
               }
               className="rounded-md border border-[var(--color-border)] bg-[var(--color-bg-primary)] px-2.5 py-1 text-xs text-[var(--color-text-secondary)] transition-colors hover:border-[var(--color-accent)] disabled:opacity-40"
             >

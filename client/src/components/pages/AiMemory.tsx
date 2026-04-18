@@ -68,7 +68,9 @@ export function AiMemory() {
     api
       .get('/memory/memories')
       .then((res) => {
-        if (!cancelled) setAllMemories(res.data)
+        const data = res.data
+        const list = Array.isArray(data) ? data : (data.memories ?? [])
+        if (!cancelled) setAllMemories(list)
       })
       .catch(() => {
         if (!cancelled) setAllMemories([])

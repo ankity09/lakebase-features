@@ -103,7 +103,7 @@ export function Autoscaling() {
         }
         setTotalQueries(status.total_queries ?? 0)
         setErrors(status.errors ?? 0)
-        setElapsed(status.elapsed ?? 0)
+        setElapsed(status.elapsed_seconds ?? 0)
       } catch {
         /* ignore polling errors */
       }
