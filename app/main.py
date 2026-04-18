@@ -57,10 +57,23 @@ v1_dir = Path(__file__).parent / "frontend" / "v1"
 if v1_dir.exists():
     app.mount("/v1", StaticFiles(directory=str(v1_dir), html=True), name="v1")
 
-# v2 React SPA (primary) — must be last mount (catches all non-API routes)
-# Try app/static (deployed), then client/build (local dev)
+# v2 React SPA — serve static assets + catch-all for client-side routing
 static_dir = Path(__file__).parent / "static"
 if not static_dir.exists():
     static_dir = Path(__file__).parent.parent / "client" / "build"
+
 if static_dir.exists():
-    app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")
+    # Mount static assets (JS, CSS, images)
+    app.mount("/assets", StaticFiles(directory=str(static_dir / "assets")), name="assets")
+
+    # Catch-all: serve index.html for any non-API route (React Router handles client-side)
+    from fastapi.responses import FileResponse
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        # If it's a real file (like favicon.ico), serve it
+        file_path = static_dir / full_path
+        if file_path.is_file():
+            return FileResponse(file_path)
+        # Otherwise serve index.html for React Router
+        return FileResponse(static_dir / "index.html")
