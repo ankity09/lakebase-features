@@ -481,252 +481,221 @@ function CompareBranches({ branches }: CompareBranchesProps) {
       </AnimatePresence>
 
       {/* Results */}
-      {hasSummary && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.2 }}
-          className="mt-4 space-y-3"
-        >
-          {/* Summary badges */}
-          <div className="flex flex-wrap gap-2">
-            {result.summary.tables_added > 0 && (
-              <span className="rounded-full bg-[var(--color-accent)]/10 px-2.5 py-1 text-xs font-medium text-[var(--color-accent)]">
-                +{result.summary.tables_added} tables
-              </span>
-            )}
-            {result.summary.tables_removed > 0 && (
-              <span className="rounded-full bg-[var(--color-danger)]/10 px-2.5 py-1 text-xs font-medium text-[var(--color-danger)]">
-                -{result.summary.tables_removed} tables
-              </span>
-            )}
-            {result.summary.columns_changed > 0 && (
-              <span className="rounded-full bg-[var(--color-warning)]/10 px-2.5 py-1 text-xs font-medium text-[var(--color-warning)]">
-                ~{result.summary.columns_changed} modified
-              </span>
-            )}
-            {result.summary.indexes_added > 0 && (
-              <span className="rounded-full bg-[var(--color-info)]/10 px-2.5 py-1 text-xs font-medium text-[var(--color-info)]">
-                +{result.summary.indexes_added} indexes
-              </span>
-            )}
-            {result.summary.indexes_removed > 0 && (
-              <span className="rounded-full bg-[var(--color-danger)]/10 px-2.5 py-1 text-xs font-medium text-[var(--color-danger)]">
-                -{result.summary.indexes_removed} indexes
-              </span>
-            )}
-          </div>
+      {hasSummary && (() => {
+        const allBaseTables = Object.keys(result.row_counts.base)
+        const allTargetTables = Object.keys(result.row_counts.target)
+        const addedTableNames = new Set(result.tables_added.map((t) => t.name))
+        const removedTableNames = new Set(result.tables_removed.map((t) => t.name))
+        const modifiedTableNames = new Set(result.column_diffs.map((d) => d.table))
 
-          {/* Tables Added */}
-          {result.tables_added.length > 0 && (
-            <div className="space-y-1.5">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
-                Tables Added
-              </span>
-              {result.tables_added.map((t) => (
-                <div
-                  key={t.name}
-                  className="rounded-lg border-l-[3px] border-l-[var(--color-accent)] bg-[var(--color-bg-tertiary)] px-3 py-2"
-                >
-                  <span className="text-sm font-medium text-[var(--color-text-primary)]">
-                    {t.name}
-                  </span>
-                  <span className="ml-2 font-[var(--font-mono)] text-xs text-[var(--color-text-muted)]">
-                    {t.row_count.toLocaleString()} rows
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+        const columnDiffsByTable: Record<string, typeof result.column_diffs[number]> = {}
+        for (const diff of result.column_diffs) {
+          columnDiffsByTable[diff.table] = diff
+        }
 
-          {/* Tables Removed */}
-          {result.tables_removed.length > 0 && (
-            <div className="space-y-1.5">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
-                Tables Removed
-              </span>
-              {result.tables_removed.map((t) => (
-                <div
-                  key={t.name}
-                  className="rounded-lg border-l-[3px] border-l-[var(--color-danger)] bg-[var(--color-bg-tertiary)] px-3 py-2"
-                >
-                  <span className="text-sm font-medium text-[var(--color-text-primary)] line-through">
-                    {t.name}
-                  </span>
-                  <span className="ml-2 font-[var(--font-mono)] text-xs text-[var(--color-text-muted)]">
-                    {t.row_count.toLocaleString()} rows
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+        const indexesByTable: Record<string, typeof result.indexes_added> = {}
+        for (const idx of result.indexes_added) {
+          const match = idx.definition.match(/ON\s+\S+\.(\S+)\s*\(/)
+          if (match) {
+            const tbl = match[1]
+            if (!indexesByTable[tbl]) indexesByTable[tbl] = []
+            indexesByTable[tbl].push(idx)
+          }
+        }
 
-          {/* Column Changes */}
-          {result.column_diffs.length > 0 && (
-            <div className="space-y-1.5">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
-                Column Changes
-              </span>
-              {result.column_diffs.map((diff) => (
-                <div
-                  key={diff.table}
-                  className="rounded-lg border-l-[3px] border-l-[var(--color-warning)] bg-[var(--color-bg-tertiary)] px-3 py-2"
-                >
-                  <div className="text-sm font-medium text-[var(--color-text-primary)]">
-                    {diff.table}
-                  </div>
-                  <div className="mt-1 space-y-0.5">
-                    {diff.columns_added.map((col) => (
-                      <div
-                        key={col.name}
-                        className="font-[var(--font-mono)] text-xs text-[var(--color-accent)]"
-                      >
-                        + {col.name}{' '}
-                        <span className="text-[var(--color-text-muted)]">
-                          {col.data_type}
-                          {col.is_nullable === 'YES' ? ' NULL' : ' NOT NULL'}
-                        </span>
-                      </div>
-                    ))}
-                    {diff.columns_removed.map((col) => (
-                      <div
-                        key={col.name}
-                        className="font-[var(--font-mono)] text-xs text-[var(--color-danger)]"
-                      >
-                        - {col.name}{' '}
-                        <span className="text-[var(--color-text-muted)]">
-                          {col.data_type}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+        const isNoDiffs =
+          result.summary.tables_added === 0 &&
+          result.summary.tables_removed === 0 &&
+          result.summary.columns_changed === 0 &&
+          result.summary.indexes_added === 0 &&
+          result.summary.indexes_removed === 0
 
-          {/* Indexes Added */}
-          {result.indexes_added.length > 0 && (
-            <div className="space-y-1.5">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
-                Indexes Added
-              </span>
-              {result.indexes_added.map((idx) => (
-                <div
-                  key={idx.name}
-                  className="rounded-lg border-l-[3px] border-l-[var(--color-info)] bg-[var(--color-bg-tertiary)] px-3 py-2"
-                >
-                  <div className="text-xs font-medium text-[var(--color-text-primary)]">
-                    {idx.name}
-                  </div>
-                  <div className="mt-0.5 font-[var(--font-mono)] text-[10px] leading-relaxed text-[var(--color-text-muted)]">
-                    {idx.definition}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Indexes Removed */}
-          {result.indexes_removed.length > 0 && (
-            <div className="space-y-1.5">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
-                Indexes Removed
-              </span>
-              {result.indexes_removed.map((idx) => (
-                <div
-                  key={idx.name}
-                  className="rounded-lg border-l-[3px] border-l-[var(--color-danger)] bg-[var(--color-bg-tertiary)] px-3 py-2"
-                >
-                  <div className="text-xs font-medium text-[var(--color-text-primary)] line-through">
-                    {idx.name}
-                  </div>
-                  <div className="mt-0.5 font-[var(--font-mono)] text-[10px] leading-relaxed text-[var(--color-text-muted)]">
-                    {idx.definition}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Row Counts */}
-          {result.row_counts &&
-            Object.keys(result.row_counts.base).length > 0 && (
-              <div className="space-y-1.5">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
-                  Row Counts
+        return (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.2 }}
+            className="mt-4 space-y-3"
+          >
+            {/* Summary badges */}
+            <div className="flex flex-wrap gap-2">
+              {result.summary.tables_added > 0 && (
+                <span className="rounded-full bg-[var(--color-accent)]/10 px-2.5 py-1 text-xs font-medium text-[var(--color-accent)]">
+                  +{result.summary.tables_added} tables
                 </span>
-                <div className="overflow-auto rounded-lg border border-[var(--color-border)]">
-                  <table className="w-full border-collapse text-left">
-                    <thead>
-                      <tr className="bg-[var(--color-bg-hover)]">
-                        <th className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
-                          Table
-                        </th>
-                        <th className="px-3 py-1.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
-                          {result.base_branch}
-                        </th>
-                        <th className="px-3 py-1.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
-                          {result.target_branch}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {Object.keys(result.row_counts.base).map((table) => {
-                        const baseCount = result.row_counts.base[table] ?? 0
-                        const targetCount = result.row_counts.target[table] ?? 0
-                        const diff = targetCount - baseCount
+              )}
+              {result.summary.tables_removed > 0 && (
+                <span className="rounded-full bg-[var(--color-danger)]/10 px-2.5 py-1 text-xs font-medium text-[var(--color-danger)]">
+                  -{result.summary.tables_removed} tables
+                </span>
+              )}
+              {result.summary.columns_changed > 0 && (
+                <span className="rounded-full bg-[var(--color-warning)]/10 px-2.5 py-1 text-xs font-medium text-[var(--color-warning)]">
+                  ~{result.summary.columns_changed} modified
+                </span>
+              )}
+              {result.summary.indexes_added > 0 && (
+                <span className="rounded-full bg-[var(--color-info)]/10 px-2.5 py-1 text-xs font-medium text-[var(--color-info)]">
+                  +{result.summary.indexes_added} indexes
+                </span>
+              )}
+              {result.summary.indexes_removed > 0 && (
+                <span className="rounded-full bg-[var(--color-danger)]/10 px-2.5 py-1 text-xs font-medium text-[var(--color-danger)]">
+                  -{result.summary.indexes_removed} indexes
+                </span>
+              )}
+            </div>
 
-                        return (
-                          <tr
-                            key={table}
-                            className="border-b border-[var(--color-border)] transition-colors hover:bg-[var(--color-bg-hover)]"
-                          >
-                            <td className="px-3 py-1.5 text-xs text-[var(--color-text-primary)]">
-                              {table}
-                            </td>
-                            <td className="px-3 py-1.5 text-right font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">
-                              {baseCount.toLocaleString()}
-                            </td>
-                            <td className="px-3 py-1.5 text-right font-[var(--font-mono)] text-xs">
-                              <span className="text-[var(--color-text-secondary)]">
-                                {targetCount.toLocaleString()}
-                              </span>
-                              {diff !== 0 && (
-                                <span
-                                  className={cn(
-                                    'ml-1.5 text-[10px]',
-                                    diff > 0
-                                      ? 'text-[var(--color-accent)]'
-                                      : 'text-[var(--color-danger)]'
-                                  )}
-                                >
-                                  {diff > 0 ? '+' : ''}
-                                  {diff.toLocaleString()}
+            {/* Side-by-side schema cards */}
+            {!isNoDiffs && (
+              <div className="grid grid-cols-2 gap-4">
+                {/* Left column — Base branch */}
+                <div className="space-y-2">
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
+                    {result.base_branch}
+                  </div>
+                  {allBaseTables.map((table) => {
+                    const isRemoved = removedTableNames.has(table)
+                    const isModified = modifiedTableNames.has(table)
+                    const isUnchanged = !isRemoved && !isModified
+                    const diff = columnDiffsByTable[table]
+
+                    return (
+                      <div
+                        key={table}
+                        className={cn(
+                          'rounded-lg border bg-[var(--color-bg-tertiary)] p-3',
+                          isRemoved && 'border-[var(--color-danger)]',
+                          isModified && 'border-[#06B6D4]',
+                          !isRemoved && !isModified && 'border-[var(--color-border)]',
+                          isUnchanged && 'opacity-50'
+                        )}
+                      >
+                        <div
+                          className={cn(
+                            'text-sm font-bold text-[var(--color-text-primary)]',
+                            isRemoved && 'text-[var(--color-danger)] line-through'
+                          )}
+                        >
+                          {table}
+                        </div>
+                        <div className="mt-1 font-[var(--font-mono)] text-xs text-[var(--color-text-muted)]">
+                          {(result.row_counts.base[table] ?? 0).toLocaleString()} rows
+                        </div>
+                        {diff && (
+                          <div className="mt-0.5 font-[var(--font-mono)] text-xs text-[var(--color-text-muted)]">
+                            {diff.columns_added.length + diff.columns_removed.length} column change{diff.columns_added.length + diff.columns_removed.length !== 1 ? 's' : ''}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Right column — Target branch */}
+                <div className="space-y-2">
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
+                    {result.target_branch}
+                  </div>
+                  {allTargetTables.map((table) => {
+                    const isAdded = addedTableNames.has(table)
+                    const isModified = modifiedTableNames.has(table)
+                    const isUnchanged = !isAdded && !isModified
+                    const diff = columnDiffsByTable[table]
+                    const tableIndexes = indexesByTable[table]
+
+                    return (
+                      <div
+                        key={table}
+                        className={cn(
+                          'rounded-lg border bg-[var(--color-bg-tertiary)] p-3',
+                          isAdded && 'border-[#00E599] bg-[#00E599]/5',
+                          !isAdded && isModified && 'border-[#06B6D4]',
+                          !isAdded && !isModified && 'border-[var(--color-border)]',
+                          isUnchanged && 'opacity-50'
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-[var(--color-text-primary)]">
+                            {table}
+                          </span>
+                          {isAdded && (
+                            <span className="rounded bg-[#00E599]/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[#00E599]">
+                              New Table
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-1 font-[var(--font-mono)] text-xs text-[var(--color-text-muted)]">
+                          {(result.row_counts.target[table] ?? 0).toLocaleString()} rows
+                        </div>
+
+                        {/* Column diffs for modified tables */}
+                        {diff && (diff.columns_added.length > 0 || diff.columns_removed.length > 0) && (
+                          <div className="mt-2 space-y-0.5">
+                            {diff.columns_added.map((col) => (
+                              <div
+                                key={col.name}
+                                className="font-[var(--font-mono)] text-xs text-[var(--color-accent)]"
+                              >
+                                + {col.name}{' '}
+                                <span className="text-[var(--color-text-muted)]">
+                                  {col.data_type}
                                 </span>
-                              )}
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
+                              </div>
+                            ))}
+                            {diff.columns_removed.map((col) => (
+                              <div
+                                key={col.name}
+                                className="font-[var(--font-mono)] text-xs text-[var(--color-danger)] line-through"
+                              >
+                                - {col.name}{' '}
+                                <span className="text-[var(--color-text-muted)]">
+                                  {col.data_type}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Added columns for new tables */}
+                        {isAdded && diff && diff.columns_added.length > 0 && (
+                          <div className="mt-2 space-y-0.5">
+                            {diff.columns_added.map((col) => (
+                              <div
+                                key={col.name}
+                                className="font-[var(--font-mono)] text-xs text-[var(--color-accent)]"
+                              >
+                                + {col.name}{' '}
+                                <span className="text-[var(--color-text-muted)]">
+                                  {col.data_type}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Index info */}
+                        {tableIndexes && tableIndexes.length > 0 && (
+                          <div className="mt-1.5 text-[10px] text-[#06B6D4]">
+                            +{tableIndexes.length} index{tableIndexes.length !== 1 ? 'es' : ''}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )}
 
-          {/* Empty state — no diffs */}
-          {result.summary.tables_added === 0 &&
-            result.summary.tables_removed === 0 &&
-            result.summary.columns_changed === 0 &&
-            result.summary.indexes_added === 0 &&
-            result.summary.indexes_removed === 0 && (
+            {/* Empty state -- no diffs */}
+            {isNoDiffs && (
               <p className="py-3 text-center text-xs text-[var(--color-text-muted)]">
                 No schema differences between branches
               </p>
             )}
-        </motion.div>
-      )}
+          </motion.div>
+        )
+      })()}
     </div>
   )
 }

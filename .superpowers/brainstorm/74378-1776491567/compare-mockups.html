@@ -1,0 +1,244 @@
+<h2>Branch Compare — Visual Options</h2>
+<p class="subtitle">Comparing production → staging. Which visualization makes the diff most intuitive for a customer demo?</p>
+
+<div class="cards">
+
+  <!-- Option A: Side-by-side schema cards -->
+  <div class="card" data-choice="side-by-side" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding: 12px;">
+      <div style="background: #0A0A0A; border-radius: 8px; padding: 12px; height: 340px; overflow: hidden;">
+        <!-- Header -->
+        <div style="display:flex;justify-content:space-between;margin-bottom:10px;">
+          <div style="font-size:10px;color:#A0A0A8;text-transform:uppercase;letter-spacing:1px;">production → staging</div>
+          <div style="display:flex;gap:4px;">
+            <span style="background:rgba(0,229,153,0.15);color:#00E599;padding:2px 8px;border-radius:10px;font-size:9px;">+1 table</span>
+            <span style="background:rgba(6,182,212,0.15);color:#06B6D4;padding:2px 8px;border-radius:10px;font-size:9px;">+4 indexes</span>
+          </div>
+        </div>
+
+        <!-- Two columns -->
+        <div style="display:flex;gap:8px;">
+          <!-- Left: Production -->
+          <div style="flex:1;">
+            <div style="font-size:9px;color:#6B6B73;text-transform:uppercase;margin-bottom:6px;text-align:center;">Production</div>
+
+            <div style="background:#1A1B20;border-radius:6px;padding:8px;margin-bottom:6px;border:1px solid #222328;">
+              <div style="font-size:10px;font-weight:600;color:#F0F0F0;margin-bottom:4px;">telemetry_events</div>
+              <div style="font-size:8px;color:#A0A0A8;line-height:1.6;">
+                event_id UUID<br>customer_id VARCHAR<br>event_time TIMESTAMPTZ<br>source_ip INET<br>
+                <span style="color:#6B6B73;">... 11 more columns</span>
+              </div>
+              <div style="font-size:8px;color:#6B6B73;margin-top:4px;">50,000 rows · 2 indexes</div>
+            </div>
+
+            <div style="background:#1A1B20;border-radius:6px;padding:8px;margin-bottom:6px;border:1px solid #222328;">
+              <div style="font-size:10px;font-weight:600;color:#F0F0F0;margin-bottom:4px;">customer_features</div>
+              <div style="font-size:8px;color:#A0A0A8;">8 columns · 60,000 rows</div>
+              <div style="font-size:8px;color:#6B6B73;">1 index</div>
+            </div>
+
+            <div style="background:#1A1B20;border-radius:6px;padding:8px;border:1px solid #222328;opacity:0.5;">
+              <div style="font-size:10px;color:#6B6B73;">+ 3 more tables</div>
+            </div>
+          </div>
+
+          <!-- Right: Staging -->
+          <div style="flex:1;">
+            <div style="font-size:9px;color:#6B6B73;text-transform:uppercase;margin-bottom:6px;text-align:center;">Staging</div>
+
+            <div style="background:#1A1B20;border-radius:6px;padding:8px;margin-bottom:6px;border:1px solid #06B6D4;">
+              <div style="font-size:10px;font-weight:600;color:#F0F0F0;margin-bottom:4px;">telemetry_events</div>
+              <div style="font-size:8px;color:#A0A0A8;line-height:1.6;">
+                event_id UUID<br>customer_id VARCHAR<br>event_time TIMESTAMPTZ<br>source_ip INET<br>
+                <span style="color:#6B6B73;">... 11 more columns</span>
+              </div>
+              <div style="font-size:8px;color:#6B6B73;margin-top:4px;">50,000 rows · <span style="color:#06B6D4;font-weight:600;">5 indexes (+3)</span></div>
+            </div>
+
+            <div style="background:#1A1B20;border-radius:6px;padding:8px;margin-bottom:6px;border:1px solid #06B6D4;">
+              <div style="font-size:10px;font-weight:600;color:#F0F0F0;margin-bottom:4px;">customer_features</div>
+              <div style="font-size:8px;color:#A0A0A8;">8 columns · 60,000 rows</div>
+              <div style="font-size:8px;color:#06B6D4;">2 indexes <span style="color:#06B6D4;">(+1)</span></div>
+            </div>
+
+            <div style="background:rgba(0,229,153,0.08);border-radius:6px;padding:8px;border:1px solid #00E599;">
+              <div style="font-size:10px;font-weight:600;color:#00E599;margin-bottom:2px;">+ customer_daily_summary</div>
+              <div style="font-size:8px;color:#A0A0A8;">6 columns · 6,196 rows</div>
+              <div style="font-size:8px;color:#00E599;">NEW TABLE</div>
+            </div>
+
+            <div style="background:#1A1B20;border-radius:6px;padding:8px;border:1px solid #222328;opacity:0.5;margin-top:6px;">
+              <div style="font-size:10px;color:#6B6B73;">+ 2 more tables (same)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A: Side-by-Side Schema Cards</h3>
+      <p>Two columns showing production (left) and target (right). New tables highlighted in green. Modified tables have cyan borders with change counts. Like a visual code diff — immediately see what's different.</p>
+    </div>
+  </div>
+
+  <!-- Option B: Migration Timeline -->
+  <div class="card" data-choice="timeline" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding: 12px;">
+      <div style="background: #0A0A0A; border-radius: 8px; padding: 12px; height: 340px; overflow: hidden;">
+        <!-- Header -->
+        <div style="font-size:10px;color:#A0A0A8;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">Migration: production → staging</div>
+
+        <!-- Timeline -->
+        <div style="position:relative;padding-left:24px;">
+          <!-- Vertical line -->
+          <div style="position:absolute;left:8px;top:0;bottom:0;width:2px;background:linear-gradient(to bottom, #00E599, #06B6D4, #F59E0B);border-radius:1px;"></div>
+
+          <!-- Step 1 -->
+          <div style="position:relative;margin-bottom:16px;">
+            <div style="position:absolute;left:-20px;top:2px;width:12px;height:12px;border-radius:50%;background:#00E599;border:2px solid #0A0A0A;"></div>
+            <div style="background:#1A1B20;border-radius:8px;padding:10px;border-left:3px solid #00E599;">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <div style="font-size:10px;font-weight:600;color:#00E599;">CREATE TABLE</div>
+                <div style="font-size:8px;color:#6B6B73;">customer_daily_summary</div>
+              </div>
+              <div style="font-size:8px;color:#A0A0A8;margin-top:4px;">6 columns: customer_id, summary_date, total_requests, unique_ips, avg_payload_bytes, error_rate</div>
+              <div style="font-size:8px;color:#00E599;margin-top:2px;">+6,196 rows of aggregated data</div>
+            </div>
+          </div>
+
+          <!-- Step 2 -->
+          <div style="position:relative;margin-bottom:16px;">
+            <div style="position:absolute;left:-20px;top:2px;width:12px;height:12px;border-radius:50%;background:#06B6D4;border:2px solid #0A0A0A;"></div>
+            <div style="background:#1A1B20;border-radius:8px;padding:10px;border-left:3px solid #06B6D4;">
+              <div style="font-size:10px;font-weight:600;color:#06B6D4;">CREATE INDEX</div>
+              <div style="font-size:8px;color:#A0A0A8;margin-top:4px;font-family:monospace;">idx_telemetry_customer_time ON telemetry_events(customer_id, event_time DESC)</div>
+            </div>
+          </div>
+
+          <!-- Step 3 -->
+          <div style="position:relative;margin-bottom:16px;">
+            <div style="position:absolute;left:-20px;top:2px;width:12px;height:12px;border-radius:50%;background:#06B6D4;border:2px solid #0A0A0A;"></div>
+            <div style="background:#1A1B20;border-radius:8px;padding:10px;border-left:3px solid #06B6D4;">
+              <div style="font-size:10px;font-weight:600;color:#06B6D4;">CREATE INDEX</div>
+              <div style="font-size:8px;color:#A0A0A8;margin-top:4px;font-family:monospace;">idx_telemetry_region_code ON telemetry_events(region, response_code)</div>
+            </div>
+          </div>
+
+          <!-- Step 4 -->
+          <div style="position:relative;margin-bottom:16px;">
+            <div style="position:absolute;left:-20px;top:2px;width:12px;height:12px;border-radius:50%;background:#06B6D4;border:2px solid #0A0A0A;"></div>
+            <div style="background:#1A1B20;border-radius:8px;padding:10px;border-left:3px solid #06B6D4;">
+              <div style="font-size:10px;font-weight:600;color:#06B6D4;">CREATE INDEX</div>
+              <div style="font-size:8px;color:#A0A0A8;margin-top:4px;font-family:monospace;">idx_features_time ON customer_features(time_bucket DESC)</div>
+            </div>
+          </div>
+
+          <!-- End marker -->
+          <div style="position:relative;">
+            <div style="position:absolute;left:-20px;top:2px;width:12px;height:12px;border-radius:50%;background:#F59E0B;border:2px solid #0A0A0A;"></div>
+            <div style="font-size:9px;color:#F59E0B;font-weight:600;padding-top:2px;">4 changes total — zero-copy, no production impact</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B: Migration Timeline</h3>
+      <p>Vertical timeline showing each change as a step. Color-coded by type (green = new tables, cyan = new indexes, amber = column changes). Reads like a story: "Here's what happened on this branch." Clear, linear, easy to narrate during a demo.</p>
+    </div>
+  </div>
+
+  <!-- Option C: Visual Table Diagram -->
+  <div class="card" data-choice="table-diagram" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding: 12px;">
+      <div style="background: #0A0A0A; border-radius: 8px; padding: 12px; height: 340px; overflow: hidden;">
+        <!-- Header -->
+        <div style="display:flex;justify-content:space-between;margin-bottom:10px;">
+          <div style="font-size:10px;color:#A0A0A8;text-transform:uppercase;letter-spacing:1px;">Schema: staging branch</div>
+          <div style="font-size:9px;color:#6B6B73;">vs production — changes highlighted</div>
+        </div>
+
+        <!-- Table cards as ER-style diagram -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+
+          <!-- telemetry_events -->
+          <div style="background:#1A1B20;border-radius:8px;border:1px solid #06B6D4;overflow:hidden;">
+            <div style="background:#06B6D4;padding:4px 8px;">
+              <div style="font-size:9px;font-weight:700;color:#0A0A0A;">telemetry_events</div>
+            </div>
+            <div style="padding:6px 8px;">
+              <div style="font-size:8px;color:#A0A0A8;line-height:1.5;">
+                event_id <span style="color:#6B6B73;">UUID PK</span><br>
+                customer_id <span style="color:#6B6B73;">VARCHAR</span><br>
+                event_time <span style="color:#6B6B73;">TIMESTAMPTZ</span><br>
+                <span style="color:#6B6B73;">... 12 more</span>
+              </div>
+              <div style="border-top:1px solid #222328;margin-top:4px;padding-top:4px;">
+                <div style="font-size:7px;color:#06B6D4;font-weight:600;">+3 INDEXES ADDED</div>
+                <div style="font-size:7px;color:#6B6B73;font-family:monospace;">customer_id+event_time</div>
+                <div style="font-size:7px;color:#6B6B73;font-family:monospace;">region+response_code</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- customer_features -->
+          <div style="background:#1A1B20;border-radius:8px;border:1px solid #06B6D4;overflow:hidden;">
+            <div style="background:#06B6D4;padding:4px 8px;">
+              <div style="font-size:9px;font-weight:700;color:#0A0A0A;">customer_features</div>
+            </div>
+            <div style="padding:6px 8px;">
+              <div style="font-size:8px;color:#A0A0A8;line-height:1.5;">
+                customer_id <span style="color:#6B6B73;">VARCHAR PK</span><br>
+                time_bucket <span style="color:#6B6B73;">TIMESTAMPTZ PK</span><br>
+                hsts_present <span style="color:#6B6B73;">BOOLEAN</span><br>
+                <span style="color:#6B6B73;">... 5 more</span>
+              </div>
+              <div style="border-top:1px solid #222328;margin-top:4px;padding-top:4px;">
+                <div style="font-size:7px;color:#06B6D4;font-weight:600;">+1 INDEX ADDED</div>
+                <div style="font-size:7px;color:#6B6B73;font-family:monospace;">time_bucket DESC</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- NEW: customer_daily_summary -->
+          <div style="background:rgba(0,229,153,0.08);border-radius:8px;border:2px solid #00E599;overflow:hidden;">
+            <div style="background:#00E599;padding:4px 8px;">
+              <div style="font-size:9px;font-weight:700;color:#0A0A0A;">+ customer_daily_summary</div>
+            </div>
+            <div style="padding:6px 8px;">
+              <div style="font-size:8px;color:#00E599;line-height:1.5;">
+                customer_id <span style="color:#A0A0A8;">VARCHAR PK</span><br>
+                summary_date <span style="color:#A0A0A8;">DATE PK</span><br>
+                total_requests <span style="color:#A0A0A8;">INT</span><br>
+                unique_ips <span style="color:#A0A0A8;">INT</span><br>
+                avg_payload_bytes <span style="color:#A0A0A8;">FLOAT</span><br>
+                error_rate <span style="color:#A0A0A8;">FLOAT</span>
+              </div>
+              <div style="border-top:1px solid rgba(0,229,153,0.3);margin-top:4px;padding-top:4px;">
+                <div style="font-size:7px;color:#00E599;font-weight:600;">NEW TABLE · 6,196 rows</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Unchanged tables -->
+          <div style="background:#1A1B20;border-radius:8px;border:1px solid #222328;overflow:hidden;opacity:0.5;">
+            <div style="background:#222328;padding:4px 8px;">
+              <div style="font-size:9px;font-weight:600;color:#6B6B73;">3 unchanged tables</div>
+            </div>
+            <div style="padding:6px 8px;">
+              <div style="font-size:8px;color:#6B6B73;line-height:1.5;">
+                model_predictions<br>
+                event_embeddings<br>
+                recovery_demo
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C: Visual Table Diagram</h3>
+      <p>ER-style card grid showing every table with its columns. New tables glow green. Modified tables have cyan headers with changes listed inside. Unchanged tables are greyed out. Feels like looking at your actual database schema — most intuitive for technical audiences.</p>
+    </div>
+  </div>
+
+</div>
