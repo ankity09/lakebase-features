@@ -102,68 +102,87 @@ def _loadtest_worker():
         try:
             start = time.perf_counter()
 
-            # Mix of heavy queries to actually stress the database
+            # CPU and memory intensive queries to trigger autoscaling
             query_type = random.random()
-            if query_type < 0.3:
-                # Heavy aggregation — GROUP BY with multiple columns
-                customer = random.choice(CUSTOMERS)
+            if query_type < 0.25:
+                # Heavy: full table aggregation with HAVING (no index help)
                 with conn.cursor() as cur:
                     cur.execute(
                         """SELECT customer_id, region, http_method,
                            COUNT(*) as cnt, AVG(payload_size_bytes) as avg_payload,
-                           MIN(event_time) as first_seen, MAX(event_time) as last_seen
+                           STDDEV(payload_size_bytes) as std_payload,
+                           PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY payload_size_bytes) as p95_payload
                            FROM appshield.telemetry_events
-                           WHERE customer_id = %s
                            GROUP BY customer_id, region, http_method
-                           ORDER BY cnt DESC""",
-                        (customer,)
+                           HAVING COUNT(*) > 5
+                           ORDER BY cnt DESC"""
                     )
                     cur.fetchall()
-            elif query_type < 0.5:
-                # Full table scan with sorting
+            elif query_type < 0.45:
+                # Heavy: cross-join subquery generating temp rows
                 with conn.cursor() as cur:
                     cur.execute(
-                        """SELECT customer_id, COUNT(*) as cnt,
-                           SUM(CASE WHEN response_code >= 400 THEN 1 ELSE 0 END) as errors,
-                           AVG(payload_size_bytes) as avg_payload
+                        """SELECT a.customer_id, b.customer_id as other_customer,
+                           COUNT(*) as shared_regions
+                           FROM (SELECT DISTINCT customer_id, region FROM appshield.telemetry_events) a
+                           JOIN (SELECT DISTINCT customer_id, region FROM appshield.telemetry_events) b
+                           ON a.region = b.region AND a.customer_id < b.customer_id
+                           GROUP BY a.customer_id, b.customer_id
+                           ORDER BY shared_regions DESC LIMIT 50"""
+                    )
+                    cur.fetchall()
+            elif query_type < 0.65:
+                # Heavy: window functions over large result sets
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """SELECT customer_id, event_time, payload_size_bytes,
+                           AVG(payload_size_bytes) OVER w as rolling_avg,
+                           MAX(payload_size_bytes) OVER w as rolling_max,
+                           ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY event_time DESC) as rn
                            FROM appshield.telemetry_events
-                           GROUP BY customer_id
-                           ORDER BY cnt DESC LIMIT 20"""
+                           WINDOW w AS (PARTITION BY customer_id ORDER BY event_time ROWS BETWEEN 50 PRECEDING AND CURRENT ROW)
+                           ORDER BY customer_id, event_time DESC
+                           LIMIT 5000"""
                     )
                     cur.fetchall()
-            elif query_type < 0.7:
-                # Join features with predictions
-                customer = random.choice(CUSTOMERS)
+            elif query_type < 0.80:
+                # Heavy: features × predictions full join with aggregation
                 with conn.cursor() as cur:
                     cur.execute(
-                        """SELECT f.customer_id, f.time_bucket, f.request_count_5min,
-                           p.app_classification, p.confidence
+                        """SELECT f.customer_id,
+                           COUNT(DISTINCT f.time_bucket) as feature_windows,
+                           COUNT(DISTINCT p.prediction_id) as predictions,
+                           AVG(f.request_count_5min) as avg_requests,
+                           AVG(p.confidence) as avg_confidence
                            FROM appshield.customer_features f
-                           LEFT JOIN appshield.model_predictions p ON f.customer_id = p.customer_id
-                           WHERE f.customer_id = %s
-                           ORDER BY f.time_bucket DESC LIMIT 50""",
-                        (customer,)
+                           FULL OUTER JOIN appshield.model_predictions p ON f.customer_id = p.customer_id
+                           GROUP BY f.customer_id
+                           ORDER BY feature_windows DESC"""
                     )
                     cur.fetchall()
-            elif query_type < 0.85:
-                # Write — batch insert
+            elif query_type < 0.90:
+                # Write: batch insert with generated data
                 with conn.cursor() as cur:
-                    for _ in range(5):
+                    for _ in range(10):
                         cur.execute(
                             "INSERT INTO appshield.loadtest_events (event_type, payload) VALUES (%s, %s)",
-                            ("loadtest", json.dumps({"ts": time.time(), "qps": qps, "customer": random.choice(CUSTOMERS)}))
+                            ("loadtest", json.dumps({"ts": time.time(), "qps": qps, "data": "x" * 500}))
                         )
             else:
-                # Window function query
-                customer = random.choice(CUSTOMERS)
+                # Heavy: recursive CTE generating series + join
                 with conn.cursor() as cur:
                     cur.execute(
-                        """SELECT customer_id, event_time, response_code, payload_size_bytes,
-                           AVG(payload_size_bytes) OVER (PARTITION BY customer_id ORDER BY event_time ROWS BETWEEN 10 PRECEDING AND CURRENT ROW) as rolling_avg
-                           FROM appshield.telemetry_events
-                           WHERE customer_id = %s
-                           ORDER BY event_time DESC LIMIT 100""",
-                        (customer,)
+                        """WITH RECURSIVE dates AS (
+                             SELECT NOW() - INTERVAL '30 days' as dt
+                             UNION ALL
+                             SELECT dt + INTERVAL '1 hour' FROM dates WHERE dt < NOW()
+                           )
+                           SELECT d.dt, COUNT(t.event_id) as events
+                           FROM dates d
+                           LEFT JOIN appshield.telemetry_events t
+                             ON t.event_time >= d.dt AND t.event_time < d.dt + INTERVAL '1 hour'
+                           GROUP BY d.dt
+                           ORDER BY d.dt"""
                     )
                     cur.fetchall()
 
