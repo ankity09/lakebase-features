@@ -49,6 +49,7 @@ from app.routers import feature_store; app.include_router(feature_store.router)
 from app.routers import pgvector; app.include_router(pgvector.router)
 from app.routers import monitoring; app.include_router(monitoring.router)
 from app.routers import recovery; app.include_router(recovery.router)
+from app.routers import memory; app.include_router(memory.router)
 
 # v2 React SPA (primary)
 build_dir = Path(__file__).parent.parent / "client" / "build"
