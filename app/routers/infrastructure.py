@@ -36,17 +36,35 @@ class ReplicaQueryRequest(BaseModel):
 
 @router.get("/autoscaling")
 def get_autoscaling():
-    """Get current autoscaling config from the real Lakebase project."""
+    """Get current autoscaling config + detect actual CU from shared_buffers."""
     try:
         ep = _api("GET", f"projects/{PROJECT}/branches/{BRANCH}/endpoints/primary")
         status = ep.get("status", {})
         min_cu = status.get("autoscaling_limit_min_cu", 0)
         max_cu = status.get("autoscaling_limit_max_cu", 0)
+
+        # Detect actual current CU from shared_buffers setting
+        # shared_buffers scales linearly with CU: ~460 MB per CU (in 8KB pages)
+        current_cu = min_cu
+        try:
+            _, rows, _ = execute_query(
+                "SELECT setting::bigint * 8192 as shared_bytes FROM pg_settings WHERE name = 'shared_buffers'"
+            )
+            if rows:
+                shared_bytes = rows[0]["shared_bytes"]
+                shared_mb = shared_bytes / (1024 * 1024)
+                # Map: 0.25 CU ≈ 57MB, 0.5 CU ≈ 115MB, 1 CU ≈ 230MB, 2 CU ≈ 460MB, etc.
+                estimated_cu = round(shared_mb / 230, 2)
+                # Clamp to min/max
+                current_cu = max(min_cu, min(max_cu, estimated_cu))
+        except Exception as pg_err:
+            logger.warning("Could not detect current CU from shared_buffers: %s", pg_err)
+
         return {
             "min_cu": min_cu,
             "max_cu": max_cu,
-            "current_cu": status.get("current_cu", min_cu),
-            "memory_gib": int(max_cu) * 4,
+            "current_cu": current_cu,
+            "memory_gib": round(current_cu * 4, 1),
             "source": "live",
         }
     except Exception as e:
