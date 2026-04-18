@@ -1,0 +1,158 @@
+<h2>Story Page Layout</h2>
+<p class="subtitle">Each of the 6 feature pages tells a guided story. How should the story be structured within the content area?</p>
+
+<div class="cards">
+  <!-- Option A: Vertical scroll -->
+  <div class="card" data-choice="vertical-scroll" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding: 16px;">
+      <div style="height: 280px; background: #0A0A0A; border-radius: 8px; overflow: hidden; display:flex;">
+        <!-- Icon rail -->
+        <div style="width: 40px; background: #131418; border-right: 1px solid #222328; flex-shrink: 0;"></div>
+        <!-- Content -->
+        <div style="flex: 1; padding: 16px; overflow: hidden;">
+          <!-- Story header -->
+          <div style="margin-bottom: 12px;">
+            <div style="font-size: 13px; font-weight: 700; color: #F0F0F0;">Feature Store</div>
+            <div style="font-size: 9px; color: #00E599;">From Raw Data to Real-Time ML in 10ms</div>
+          </div>
+          <!-- Before/After section -->
+          <div style="background: #1A1B20; border-radius: 8px; padding: 10px; margin-bottom: 8px;">
+            <div style="font-size: 9px; color: #A0A0A8; font-weight: 600; margin-bottom: 6px;">THE PROBLEM</div>
+            <div style="font-size: 8px; color: #6B6B73;">Computing features at query time takes 500ms+. Users see a loading spinner.</div>
+          </div>
+          <!-- Architecture diagram -->
+          <div style="background: #1A1B20; border-radius: 8px; padding: 10px; margin-bottom: 8px;">
+            <div style="font-size: 9px; color: #A0A0A8; font-weight: 600; margin-bottom: 6px;">THE ARCHITECTURE</div>
+            <div style="display:flex;gap:4px;align-items:center;justify-content:center;">
+              <div style="background:#222328;padding:4px 6px;border-radius:4px;font-size:7px;color:#A0A0A8;">Raw</div>
+              <span style="color:#00E599;font-size:8px;">→</span>
+              <div style="background:#222328;padding:4px 6px;border-radius:4px;font-size:7px;color:#A0A0A8;">Features</div>
+              <span style="color:#00E599;font-size:8px;">→</span>
+              <div style="background:rgba(0,229,153,0.15);padding:4px 6px;border-radius:4px;font-size:7px;color:#00E599;border:1px solid #00E599;">Lakebase</div>
+              <span style="color:#00E599;font-size:8px;">→</span>
+              <div style="background:#222328;padding:4px 6px;border-radius:4px;font-size:7px;color:#A0A0A8;">Model</div>
+            </div>
+          </div>
+          <!-- Interactive section -->
+          <div style="background: #1A1B20; border-radius: 8px; padding: 10px;">
+            <div style="font-size: 9px; color: #A0A0A8; font-weight: 600; margin-bottom: 6px;">TRY IT</div>
+            <div style="display:flex;gap:8px;">
+              <div style="background:#222328;padding:4px 8px;border-radius:4px;font-size:8px;color:#00E599;border:1px solid #00E599;">Lookup acme-corp</div>
+              <div style="background:#222328;padding:4px 8px;border-radius:4px;font-size:8px;color:#6B6B73;">Compare latency</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A: Vertical Scroll</h3>
+      <p>Story flows top-to-bottom in sections: Problem → Architecture → Try It → Results. Customer scrolls naturally. Simple, familiar. But the architecture diagram and interactive area can't be seen at the same time.</p>
+    </div>
+  </div>
+
+  <!-- Option B: Split — visual + interactive -->
+  <div class="card" data-choice="split-view" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding: 16px;">
+      <div style="height: 280px; background: #0A0A0A; border-radius: 8px; overflow: hidden; display:flex;">
+        <!-- Icon rail -->
+        <div style="width: 40px; background: #131418; border-right: 1px solid #222328; flex-shrink: 0;"></div>
+        <!-- Left: Visual story -->
+        <div style="flex: 1; padding: 12px; border-right: 1px solid #222328;">
+          <div style="font-size: 9px; color: #A0A0A8; font-weight: 600; margin-bottom: 8px;">VISUAL STORY</div>
+          <!-- Animated arch diagram -->
+          <div style="background: #1A1B20; border-radius: 8px; padding: 12px; height: 100px; margin-bottom: 8px; display:flex;flex-direction:column;align-items:center;justify-content:center;">
+            <div style="display:flex;gap:4px;align-items:center;">
+              <div style="background:#222328;padding:4px 6px;border-radius:4px;font-size:7px;color:#A0A0A8;">Raw</div>
+              <span style="color:#00E599;font-size:8px;">→</span>
+              <div style="background:#222328;padding:4px 6px;border-radius:4px;font-size:7px;color:#A0A0A8;">Compute</div>
+              <span style="color:#00E599;font-size:8px;">→</span>
+              <div style="background:rgba(0,229,153,0.15);padding:4px 6px;border-radius:4px;font-size:7px;color:#00E599;border:1px solid #00E599;">Lakebase</div>
+            </div>
+            <div style="font-size:7px;color:#6B6B73;margin-top:6px;">[ Animated — lights up as you interact ]</div>
+          </div>
+          <!-- Before/after -->
+          <div style="display:flex;gap:6px;">
+            <div style="flex:1;background:rgba(239,68,68,0.08);border-left:2px solid #EF4444;padding:6px;border-radius:0 6px 6px 0;">
+              <div style="font-size:7px;color:#EF4444;font-weight:600;">OLD WAY</div>
+              <div style="font-size:7px;color:#A0A0A8;">500ms query time</div>
+            </div>
+            <div style="flex:1;background:rgba(0,229,153,0.08);border-left:2px solid #00E599;padding:6px;border-radius:0 6px 6px 0;">
+              <div style="font-size:7px;color:#00E599;font-weight:600;">LAKEBASE</div>
+              <div style="font-size:7px;color:#A0A0A8;">7ms query time</div>
+            </div>
+          </div>
+        </div>
+        <!-- Right: Interactive panel -->
+        <div style="flex: 1; padding: 12px;">
+          <div style="font-size: 9px; color: #A0A0A8; font-weight: 600; margin-bottom: 8px;">INTERACTIVE</div>
+          <div style="background: #1A1B20; border-radius: 6px; padding: 8px; margin-bottom: 6px;">
+            <div style="font-size:8px;color:#F0F0F0;margin-bottom:4px;">Customer ID</div>
+            <div style="background:#222328;padding:4px 6px;border-radius:4px;font-size:8px;color:#00E599;border:1px solid #222328;">acme-corp</div>
+          </div>
+          <div style="background:#1A1B20;border-radius:6px;padding:8px;margin-bottom:6px;">
+            <div style="font-size:8px;color:#F0F0F0;margin-bottom:4px;">Features (7.3ms)</div>
+            <div style="font-size:7px;color:#A0A0A8;">hsts: true, ips: 12, reqs: 847</div>
+          </div>
+          <div style="background:#1A1B20;border-radius:6px;padding:8px;">
+            <div style="font-size:8px;color:#F0F0F0;margin-bottom:4px;">Results Table</div>
+            <div style="font-size:7px;color:#6B6B73;">[ Data grid with latency badges ]</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B: Split View — Visual Left, Interactive Right</h3>
+      <p>Left panel shows the visual story (animated diagrams, before/after comparisons). Right panel is the interactive area (inputs, results, live data). Both visible at all times. The visual updates as you interact — architecture nodes glow when data flows through them.</p>
+    </div>
+  </div>
+
+  <!-- Option C: Stepped wizard -->
+  <div class="card" data-choice="stepped-wizard" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding: 16px;">
+      <div style="height: 280px; background: #0A0A0A; border-radius: 8px; overflow: hidden; display:flex;">
+        <!-- Icon rail -->
+        <div style="width: 40px; background: #131418; border-right: 1px solid #222328; flex-shrink: 0;"></div>
+        <!-- Content -->
+        <div style="flex: 1; padding: 12px;">
+          <!-- Step indicator -->
+          <div style="display:flex;gap:4px;margin-bottom:12px;">
+            <div style="flex:1;height:3px;background:#00E599;border-radius:2px;"></div>
+            <div style="flex:1;height:3px;background:#00E599;border-radius:2px;"></div>
+            <div style="flex:1;height:3px;background:#222328;border-radius:2px;"></div>
+            <div style="flex:1;height:3px;background:#222328;border-radius:2px;"></div>
+          </div>
+          <!-- Step header -->
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <div>
+              <div style="font-size: 9px; color: #00E599; font-weight: 600;">STEP 2 OF 4</div>
+              <div style="font-size: 13px; font-weight: 700; color: #F0F0F0;">Watch the Lookup</div>
+            </div>
+            <div style="display:flex;gap:4px;">
+              <div style="padding:4px 8px;background:#222328;border-radius:4px;font-size:8px;color:#A0A0A8;">← Back</div>
+              <div style="padding:4px 8px;background:#00E599;border-radius:4px;font-size:8px;color:#0A0A0A;font-weight:600;">Next →</div>
+            </div>
+          </div>
+          <!-- Full-width step content -->
+          <div style="background: #1A1B20; border-radius: 8px; padding: 12px; height: 140px; display:flex;flex-direction:column;align-items:center;justify-content:center;">
+            <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;">
+              <div style="background:#222328;padding:6px 10px;border-radius:6px;font-size:8px;color:#A0A0A8;">Input: acme-corp</div>
+              <span style="color:#00E599;font-size:14px;">→</span>
+              <div style="background:rgba(0,229,153,0.15);padding:6px 10px;border-radius:6px;font-size:8px;color:#00E599;border:1px solid #00E599;">Lakebase: 7ms</div>
+              <span style="color:#00E599;font-size:14px;">→</span>
+              <div style="background:#222328;padding:6px 10px;border-radius:6px;font-size:8px;color:#A0A0A8;">Features returned</div>
+            </div>
+            <div style="font-size:8px;color:#6B6B73;">[ Full-width animated visualization for this step ]</div>
+          </div>
+          <!-- Step narrative -->
+          <div style="margin-top:8px;padding:8px;background:#1A1B20;border-radius:6px;">
+            <div style="font-size:8px;color:#A0A0A8;">"The customer opens their dashboard. In <span style="color:#00E599;">7ms</span>, Lakebase returns all 8 features needed for the ML model. The user never sees a loading spinner."</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C: Stepped Wizard — One Thing at a Time</h3>
+      <p>Each story is a 3-5 step wizard with progress bar. One full-width visual per step with narrative text below. Next/Back navigation. Maximum visual impact per step — no split attention. Like the Recovery page's step flow, but for every feature.</p>
+    </div>
+  </div>
+</div>

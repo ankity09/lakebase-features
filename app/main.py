@@ -50,7 +50,12 @@ from app.routers import pgvector; app.include_router(pgvector.router)
 from app.routers import monitoring; app.include_router(monitoring.router)
 from app.routers import recovery; app.include_router(recovery.router)
 
-# Serve vanilla frontend from app/frontend/
-frontend_dir = Path(__file__).parent / "frontend"
-if frontend_dir.exists():
-    app.mount("/", StaticFiles(directory=str(frontend_dir), html=True), name="static")
+# v2 React SPA (primary)
+build_dir = Path(__file__).parent.parent / "client" / "build"
+if build_dir.exists():
+    app.mount("/", StaticFiles(directory=str(build_dir), html=True), name="static")
+
+# v1 vanilla fallback at /v1/
+v1_dir = Path(__file__).parent / "frontend" / "v1"
+if v1_dir.exists():
+    app.mount("/v1", StaticFiles(directory=str(v1_dir), html=True), name="v1")
