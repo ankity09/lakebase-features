@@ -1,15 +1,16 @@
 @import "tailwindcss";
 
 @theme {
-  --color-neon: #00E599;
-  --color-neon-glow: rgba(0, 229, 153, 0.15);
-  --color-surface-0: #0A0A0A;
-  --color-surface-1: #131418;
-  --color-surface-2: #1A1B20;
-  --color-surface-3: #222328;
+  --color-bg-primary: #0A0A0A;
+  --color-bg-secondary: #111418;
+  --color-bg-tertiary: #1A1B20;
+  --color-bg-hover: #222328;
+  --color-border: #2A2A32;
   --color-text-primary: #F0F0F0;
   --color-text-secondary: #A0A0A8;
   --color-text-muted: #6B6B73;
+  --color-accent: #00E599;
+  --color-accent-glow: rgba(0, 229, 153, 0.15);
   --color-danger: #EF4444;
   --color-warning: #F59E0B;
   --color-info: #06B6D4;
@@ -18,27 +19,39 @@
 }
 
 body {
-  background-color: var(--color-surface-0);
+  background: var(--color-bg-primary);
   color: var(--color-text-primary);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   margin: 0;
 }
 
-/* Scrollbar styling */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: var(--color-surface-1); }
-::-webkit-scrollbar-thumb { background: var(--color-surface-3); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--color-text-muted); }
+[data-theme="light"] {
+  --color-bg-primary: #FFFFFF;
+  --color-bg-secondary: #F7F8FA;
+  --color-bg-tertiary: #F0F1F3;
+  --color-bg-hover: #E8E9EC;
+  --color-border: #D1D5DB;
+  --color-text-primary: #111827;
+  --color-text-secondary: #6B7280;
+  --color-text-muted: #9CA3AF;
+  --color-accent: #059669;
+  --color-accent-glow: rgba(5, 150, 105, 0.12);
+  --color-danger: #DC2626;
+  --color-warning: #D97706;
+  --color-info: #0891B2;
+}
 
-/* Skeleton shimmer */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--color-bg-secondary); }
+::-webkit-scrollbar-thumb { background: var(--color-bg-hover); border-radius: 3px; }
+
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
-
 .skeleton {
-  background: linear-gradient(90deg, var(--color-surface-2) 25%, var(--color-surface-3) 50%, var(--color-surface-2) 75%);
+  background: linear-gradient(90deg, var(--color-bg-tertiary) 25%, var(--color-bg-hover) 50%, var(--color-bg-tertiary) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
   border-radius: 6px;
