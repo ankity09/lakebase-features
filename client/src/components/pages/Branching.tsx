@@ -706,7 +706,7 @@ export function Branching() {
   const [branches, setBranches] = useState<BranchInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
-  const [deleting, setDeleting] = useState(false)
+  const [_deleting, setDeleting] = useState(false)
 
   const fetchBranches = useCallback(async () => {
     try {
